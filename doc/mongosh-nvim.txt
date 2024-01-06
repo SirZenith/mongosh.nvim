@@ -1,0 +1,56 @@
+*mongosh.nvim*    A frontend for `mongosh` in NeoVim.
+
+===============================================================================
+1.Prerequest                                          *mongosh-nvim-prerequest*
+
+Your should have `mongosh` installed on your machine.
+
+===============================================================================
+2. Commands                                              *mongosh-nvim-command*
+
+*:MongoConnect*
+
+    connecting to database in host machine.
+
+*:MongoDatabase*
+
+    choose a database from list of available databases.
+
+*:MongoCollection*
+
+    list all available collections in a buffer, and pick one to create a new
+    query buffer.
+
+*:MongoExecute*
+
+    run content of current buffer in mongosh.
+
+*:MongoNewQuery*
+
+    pick a collection name from list, and create a new query buffer for that
+    collection.
+
+*:MongoQuery*
+
+    create query script with current buffer content, query result will be
+    written to buffer.
+
+*:MongoNewEdit*
+
+    create a new edit buffer with given collection name, document id.
+
+*:MongoEdit*
+
+    do edit operation with current buffer content, behavior vary to the type of
+    current buffer.
+
+    - On query result buffer, a new edit buffer with collection name of that
+    query, and id of the nearest document to cursor.
+    - On edit buffer, create and run a replace script with current buffer
+    content. Executation result will be written to another buffer.
+
+*:MongoRefresh*
+
+    regenerates content of current buffer according to its type.
+
+vim:tw=78:ts=4:sw=4:et:ft=help:norl:
