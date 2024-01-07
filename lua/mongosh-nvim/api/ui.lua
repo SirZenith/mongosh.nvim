@@ -11,6 +11,18 @@ local BufferType = buffer_const.BufferType
 
 local M = {}
 
+-- refresh_buffer tries to refresh given buffer.
+---@param bufnr integer
+function M.refresh_buffer(bufnr)
+    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+
+    if mbuf then
+        mbuf:refresh()
+    else
+        log.warn("current buffer is not refreshable")
+    end
+end
+
 -- select_database selects a database among available ones.
 ---@param db_name string
 function M.select_database(db_name)
@@ -136,10 +148,6 @@ function M.select_collection_ui_list()
     )
 end
 
----@class mongo.RunExecutionArgs
----@field script? string # query snippet, if `nil`, query snippet will be read from current buffer
----@field with_range boolean # when read query from current buffer, use visual selected text
-
 -- create_edit_buffer creates a new buffer with editing snippet for given document.
 ---@param collection string # collection name
 ---@param id string # `_id` of target document
@@ -171,6 +179,83 @@ function M.create_edit_buffer(collection, id)
             id = id,
         }
     end, "failed to update document content")
+end
+
+-- ----------------------------------------------------------------------------
+
+---@class mongo.ExecuteBufferArgs
+---@field with_range boolean
+
+-- run_buffer_executation executes snippet in given buffer.
+---@param bufnr integer
+---@param args mongo.ExecuteBufferArgs
+function M.run_buffer_executation(bufnr, args)
+    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+        or buffer_state.wrap_with_mongo_buffer(BufferType.Execute, bufnr)
+
+    local supported_types = {
+        [BufferType.Execute] = true,
+        [BufferType.Query] = true,
+        [BufferType.Edit] = true,
+    }
+
+    if supported_types[mbuf.type] then
+        mbuf:write_result(args)
+    else
+        log.warn("current buffer doesn't support Execute commnad")
+    end
+end
+
+---@class mongo.RunBufferQueryArgs
+---@field with_range boolean
+
+-- run_buffer_query runs query snippet in given buffer.
+---@param bufnr integer
+---@param args mongo.RunBufferQueryArgs
+function M.run_buffer_query(bufnr, args)
+    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+        or buffer_state.wrap_with_mongo_buffer(BufferType.Query, bufnr)
+
+    if mbuf.type == BufferType.Execute then
+        mbuf:change_type_to(BufferType.Query)
+    end
+
+    local supported_types = {
+        [BufferType.Query] = true,
+    }
+
+    if supported_types[mbuf.type] then
+        vim.print(args)
+        mbuf:write_result {}
+    else
+        log.warn("current buffer doesn't support Query command")
+    end
+end
+
+---@class mongo.RunBufferEditArgs
+---@field with_range boolean
+
+-- run_buffer_edit runs replace snippet in given buffer
+---@param bufnr integer
+---@param args mongo.RunBufferEditArgs
+function M.run_buffer_edit(bufnr, args)
+    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+        or buffer_state.wrap_with_mongo_buffer(BufferType.Edit, bufnr)
+
+    if mbuf.type == BufferType.Execute then
+        mbuf:change_type_to(BufferType.Edit)
+    end
+
+    local supported_types = {
+        [BufferType.QueryResult] = true,
+        [BufferType.Edit] = true,
+    }
+
+    if supported_types[mbuf.type] then
+        mbuf:write_result(args)
+    else
+        log.warn("current buffer doesn't support Edit command")
+    end
 end
 
 return M
