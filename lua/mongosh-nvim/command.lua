@@ -102,6 +102,26 @@ local function parse_fargs(args)
     return parsed_args
 end
 
+-- validate_required_args checks if all required arguments have non-nil value.
+---@param spec_list (string | nil)[][]
+---@return string? err
+local function validate_required_args(spec_list)
+    local err
+
+    for _, spec in ipairs(spec_list) do
+        local value = spec[1]
+        local msg = spec[2]
+        if value == nil then
+            err = msg
+                and msg .. " is required"
+                or "required value is missing"
+            break
+        end
+    end
+
+    return err
+end
+
 -- flag_completion is a simple completion function for command flags.
 ---@param flag_list string[] # e.g. { "-a", "--bar" }
 ---@param arg_lead string
@@ -184,13 +204,13 @@ cmd("MongoNewEdit", function(args)
     local collection = parsed_args.collection or parsed_args.coll
     local id = parsed_args.id
 
-    if collection == nil then
-        log.warn("not collection name provided")
-        return
-    end
+    local err = validate_required_args {
+        { collection, "collection name" },
+        { id, "document id" },
+    }
 
-    if not nil then
-        log.warn("no document id provided")
+    if err then
+        log.warn(err)
         return
     end
 
