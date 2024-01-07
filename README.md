@@ -29,6 +29,8 @@ require "mongosh-nvim".setup {
 }
 ```
 
+Default config value and introduction of each option can be found [here](https://github.com/SirZenith/mongosh.nvim/blob/main/lua/mongosh-nvim/config.lua).
+
 ## Usage
 
 Check out `:help mongosh-nvim` for documentation.
