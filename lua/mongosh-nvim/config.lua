@@ -44,10 +44,19 @@ M = {
             [BufferType.Unknown] = function(bufnr)
                 local buffer_state = require "mongosh-nvim.state.buffer"
 
+                -- 'build' buffer
                 vim.keymap.set("n", "<A-b>", function()
                     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
                     if mbuf then
                         mbuf:write_result {}
+                    end
+                end, { buffer = bufnr })
+
+                -- refresh buffer
+                vim.keymap.set("n", "<A-r>", function()
+                    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+                    if mbuf then
+                        mbuf:refresh()
                     end
                 end, { buffer = bufnr })
             end,

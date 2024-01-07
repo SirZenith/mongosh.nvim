@@ -10,10 +10,18 @@ mongosh and inspect executation result in NeoVim.
 You can:
 
 - List available databases and collections on a host.
-- Execute script in buffer
-- Make query by buffer content
-- Edit document by buffer content
+- Execute script in buffer.
+- Make query by buffer content.
+- Edit document by buffer content.
 - Refresh result buffer after some data operations.
+
+Following option can be customized:
+
+- Executable path of `mongsh`.
+- Indent size for JSON result.
+- How result window splits current view.
+- Action on new buffer gets created by plugin, you can set keymap in new buffer
+or do other things of your interest.
 
 ## Installation
 

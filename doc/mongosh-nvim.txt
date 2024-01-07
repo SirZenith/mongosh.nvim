@@ -1,56 +1,155 @@
 *mongosh.nvim*    A frontend for `mongosh` in NeoVim.
 
 ===============================================================================
-1.Prerequest                                          *mongosh-nvim-prerequest*
+Table of Contents
+
+1. Prerequest                                          |mongosh-nvim-prerequest|
+2. Overview                                             |mongosh-nvim-overview|
+3. Commands                                              |mongosh-nvim-command|
+4. Configuration                                   |mongosh-nvim-configuration|
+
+===============================================================================
+1. Prerequest                                          *mongosh-nvim-prerequest*
 
 Your should have `mongosh` installed on your machine.
 
 ===============================================================================
-2. Commands                                              *mongosh-nvim-command*
+2. Overview                                             *mongosh-nvim-overview*
+
+This plugin talk to mongosh with buffer content, and write operation result as
+buffer content. When a new buffer should be created, and how that buffer
+should be shown on screen is configurable.
+
+On each executation, a new mongosh process is spawn for evaluation. No long
+term connection is kept.
+
+This plugin manage its operations by attaching meta info to buffers.
+
+For example, by recognizing operation type of a buffer, one command can behave
+differently on different buffer, see |:MongoEdit|.
+
+If a buffer is created by this plugin, such meta info will be attached as the
+buffer is created. For an existing buffer, once your run command with its
+content, corresponding meta info will then be attached to that buffer.
+
+By default, when meta info is attached to a buffer, following key map will be
+set on that buffer:
+    - `<A-b>`, 'build' the buffer, which means generates result buffer with
+    its content.
+    - `<A-r>`, refresh the buffer, regenerate its content with information
+    binded to the buffer.
+
+You can set your custom keymap when such meta info is created with user config
+if you like to.
+
+===============================================================================
+3. Commands                                              *mongosh-nvim-command*
 
 *:MongoConnect*
 
-    connecting to database in host machine.
+    Sets current target host address. If no host is provided via flag argument,
+    plugin will use the default host in config.
+
+    Available flags:
+        - `host`, address of host machine.
+        - `db`, target database name.
 
 *:MongoDatabase*
 
-    choose a database from list of available databases.
+    List all available databases on current host, pick one as current target.
 
 *:MongoCollection*
 
-    list all available collections in a buffer, and pick one to create a new
-    query buffer.
+    List all available collections in a buffer, pick one to create a new query
+    buffer.
+    Selection is made putting cursor on target collection name and press `Enter`
+    key.
 
 *:MongoExecute*
 
-    run content of current buffer in mongosh.
+    Run content in current buffer with mongosh. Command support range argument.
+    With visual selection, only selected part will be executed.
+
+    Standard out put of executation will be display in another buffer.
+
+    Please note that you need to print out all information of your interest in
+    your script snippet yourself, or else there will only be default content
+    in result buffer.
 
 *:MongoNewQuery*
 
-    pick a collection name from list, and create a new query buffer for that
-    collection.
+    List all available collections in current database. Create a new query
+    buffer with user selection.
 
 *:MongoQuery*
 
-    create query script with current buffer content, query result will be
-    written to buffer.
+    Run query in current buffer. Command support range argument.
+    With visual selection, only selected part will be executed.
+
+    Query result will be written to buffer.
+
+    Query snippet should be a single expression that resolve to a database
+    cursor value, such as a call to `db.collection.find()` method. Query
+    buffer created by this plugin will have example snippet as their initial
+    content.
+
+    Before gets run, query snippet will be embeded into a template. Cursor
+    value returned by query expression will be written to result buffer as
+    JSON.
 
 *:MongoNewEdit*
 
-    create a new edit buffer with given collection name, document id.
+    Create a new edit buffer with given collection name, document id.
+
+    Available flags:
+        - `collection`, `coll`, target collection name.
+        - `id`, document's `_id` field value.
 
 *:MongoEdit*
 
-    do edit operation with current buffer content, behavior vary to the type of
-    current buffer.
+    Run edit snippet in current buffer. Command support range argument.
+    With visual selection, only selected part will be executed.
 
-    - On query result buffer, a new edit buffer with collection name of that
-    query, and id of the nearest document to cursor.
-    - On edit buffer, create and run a replace script with current buffer
+    Final behavior varies according to the type of current buffer.
+
+    - With query result buffer, a new edit buffer with collection name of that
+    query, and id of the nearest document to cursor will be created.
+    - With edit buffer, create and run a replace snippet with current buffer
     content. Executation result will be written to another buffer.
+
+    A replace snippet for edit buffer should define following variables:
+        - `collection`, string value for collection name.
+        - `id`, target document's `_id` value.
+        - `replacement`, new document value to use as `replaceOne` argument
+
+    Replace snippet will be merge into a template with `replaceOne` call into
+    the collection of your choice.
+
+    Executation result of a replace snippet will be written to result buffer
+    as JSON text.
 
 *:MongoRefresh*
 
-    regenerates content of current buffer according to its type.
+    Regenerates content of current buffer according to its type.
+
+    For example, running this command in a query result buffer will run its
+    query again, and query result will again be written to that buffer.
+
+===============================================================================
+4. Configuration                                   *mongosh-nvim-configuration*
+
+All available config options and default config value are list at
+https://github.com/SirZenith/mongosh.nvim/blob/main/lua/mongosh-nvim/config.lua
+
+User config table should be passed to plugin by
+
+>lua
+require "mongosh-nvim".setup {
+    -- your config here
+}
+<
+
+User config will be merge into default config. Options that not provided by
+user will use default value.
 
 vim:tw=78:ts=4:sw=4:et:ft=help:norl:
