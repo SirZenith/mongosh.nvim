@@ -42,3 +42,7 @@ Default config value and introduction of each option can be found [here](https:/
 ## Usage
 
 Check out `:help mongosh-nvim` for documentation.
+
+Overview video:
+
+[![usage overview](https://i.ytimg.com/vi/vrbWCXzwK4M/maxresdefault.jpg)](https://www.youtube.com/watch?v=vrbWCXzwK4M)
