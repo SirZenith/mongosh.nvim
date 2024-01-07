@@ -45,4 +45,4 @@ Check out `:help mongosh-nvim` for documentation.
 
 Overview video:
 
-[![usage overview](https://i.ytimg.com/vi/vrbWCXzwK4M/maxresdefault.jpg)](https://www.youtube.com/watch?v=vrbWCXzwK4M)
+[![usage overview](https://i.ytimg.com/vi/lnBtr-dtoAk/maxresdefault.jpg)](https://www.youtube.com/watch?v=lnBtr-dtoAk)
