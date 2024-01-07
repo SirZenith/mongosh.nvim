@@ -1,5 +1,9 @@
 local buffer_const = require "mongosh-nvim.constant.buffer"
 
+local BufferType = buffer_const.BufferType
+local CreateBufferStyle = buffer_const.CreateBufferStyle
+local ResultSplitStyle = buffer_const.ResultSplitStyle
+
 local M = {}
 
 M = {
@@ -29,19 +33,27 @@ M = {
         -- When a snippe buffer for query, editing, etc. needs to be shown, how
         -- this plugin would create a window for it.
         ---@type mongo.ResultSplitStyle
-        split_style = buffer_const.ResultSplitStyle.Tab,
+        split_style = ResultSplitStyle.Tab,
+
+        -- map for function to be call when a mongo buffer of certain type is
+        -- created.
+        ---@type table<mongo.BufferType, fun(bufnr: integer)>
+        on_create = {
+            -- fallback operation for all buffer type with no on-create function.
+            [BufferType.Unknown] = function() end,
+        },
     },
 
     result_buffer = {
         -- How this plugin would create a new result window.
         -- This will be default value for new buffer.
         ---@type mongo.ResultSplitStyle
-        split_style = buffer_const.ResultSplitStyle.Vertical,
+        split_style = ResultSplitStyle.Vertical,
 
         -- When this plugin should create a new result buffer.
         -- This will be default value for new buffer.
         ---@type mongo.CreateBufferStyle
-        create_buffer_style = buffer_const.CreateBufferStyle.OnNeed,
+        create_buffer_style = CreateBufferStyle.OnNeed,
     },
 }
 

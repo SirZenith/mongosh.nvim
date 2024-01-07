@@ -541,6 +541,11 @@ function MongoBuffer:new(type, src_bufnr, result_bufnr, bufnr)
     obj:init_autocmd()
     obj:setup_buf_options()
 
+    local on_create = config.dialog.on_create[type] or config.dialog.on_create[BufferType.Unknown]
+    if on_create then
+        on_create(bufnr)
+    end
+
     return obj
 end
 
