@@ -47,6 +47,33 @@ local function read_lines_from_buf(bufnr)
     return lines
 end
 
+-- get_visual_selection returns visual selection range in current buffer.
+---@return number? row_st
+---@return number? col_st
+---@return number? row_ed
+---@return number? col_ed
+local function get_visual_selection_range()
+    local unpac = unpack or table.unpack
+    local _, st_r, st_c, _ = unpac(vim.fn.getpos("'<"))
+    local _, ed_r, ed_c, _ = unpac(vim.fn.getpos("'>"))
+    if st_r * st_c * ed_r * ed_c == 0 then return nil end
+    if st_r < ed_r or (st_r == ed_r and st_c <= ed_c) then
+        return st_r - 1, st_c - 1, ed_r - 1, ed_c
+    else
+        return ed_r - 1, ed_c - 1, st_r - 1, st_c
+    end
+end
+
+-- get_visual_selection_text returns visual selected text in current buffer.
+---@return string[] lines
+local function get_visual_selection_text()
+    local st_r, st_c, ed_r, ed_c = get_visual_selection_range()
+    if not (st_r or st_c or ed_r or ed_c) then return {} end
+
+    local lines = api.nvim_buf_get_text(0, st_r, st_c, ed_r, ed_c, {})
+    return lines
+end
+
 -- ----------------------------------------------------------------------------
 
 ---@type table<mongo.CreateBufferStyle, fun(mbuf: mongo.MongoBuffer)>
@@ -202,8 +229,10 @@ local result_generator_map = {
             content = content,
         }
     end,
-    [BufferType.Execute] = function(mbuf, _, callback)
-        local lines = mbuf:get_lines()
+    [BufferType.Execute] = function(mbuf, args, callback)
+        local lines = args.with_range
+            and mbuf:get_visual_selection()
+            or mbuf:get_lines()
         local snippet = table.concat(lines, "\n")
 
         api_core.do_execution(snippet, function(err, result)
@@ -224,8 +253,10 @@ local result_generator_map = {
             }
         end)
     end,
-    [BufferType.Query] = function(mbuf, _, callback)
-        local lines = mbuf:get_lines()
+    [BufferType.Query] = function(mbuf, args, callback)
+        local lines = args.with_range
+            and mbuf:get_visual_selection()
+            or mbuf:get_lines()
         local query = table.concat(lines, "\n")
 
         api_core.do_query(query, function(err, response)
@@ -296,8 +327,10 @@ local result_generator_map = {
             }
         end, "failed to update document content")
     end,
-    [BufferType.Edit] = function(mbuf, _, callback)
-        local lines = mbuf:get_lines()
+    [BufferType.Edit] = function(mbuf, args, callback)
+        local lines = args.with_range
+            and mbuf:get_visual_selection()
+            or mbuf:get_lines()
         local snippet = table.concat(lines, "\n")
 
         api_core.do_replace(snippet, function(err, result)
@@ -559,6 +592,16 @@ end
 function MongoBuffer:set_lines(lines)
     local bufnr = self.bufnr
     api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
+end
+
+-- get_visual_selection returns visual selected text in current buffer.
+---@return string[]
+function MongoBuffer:get_visual_selection()
+    local bufnr = self.bufnr
+    local cur_bufnr = api.nvim_win_get_buf(0)
+    if bufnr ~= cur_bufnr then return {} end
+
+    return get_visual_selection_text()
 end
 
 -- make_result_buffer returns buffer number of the buffer which write result to according to buffer

@@ -225,8 +225,7 @@ function M.run_buffer_query(bufnr, args)
     }
 
     if supported_types[mbuf.type] then
-        vim.print(args)
-        mbuf:write_result {}
+        mbuf:write_result(args)
     else
         log.warn("current buffer doesn't support Query command")
     end
