@@ -35,12 +35,22 @@ M = {
         ---@type mongo.ResultSplitStyle
         split_style = ResultSplitStyle.Tab,
 
-        -- map for function to be call when a mongo buffer of certain type is
+        -- Map for function to be call when a mongo buffer of certain type is
         -- created.
+        -- This can be used to create custom keymap in new buffer.
         ---@type table<mongo.BufferType, fun(bufnr: integer)>
         on_create = {
             -- fallback operation for all buffer type with no on-create function.
-            [BufferType.Unknown] = function() end,
+            [BufferType.Unknown] = function(bufnr)
+                local buffer_state = require "mongosh-nvim.state.buffer"
+
+                vim.keymap.set("n", "<A-b>", function()
+                    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+                    if mbuf then
+                        mbuf:write_result {}
+                    end
+                end, { buffer = bufnr })
+            end,
         },
     },
 

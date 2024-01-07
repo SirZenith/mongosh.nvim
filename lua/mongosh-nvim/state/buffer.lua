@@ -495,6 +495,7 @@ local buffer_refresher_map = {
 --
 ---@field bufnr integer # buffer number of this buffer.
 ---@field dummy_lines? string[] # for dummy buffer, this will be its content.
+---@field is_destroied boolean
 --
 ---@field src_bufnr? integer # source buffer that create this buffer.
 ---@field result_bufnr? integer # result buffer used to display executation result of this buffer.
@@ -624,6 +625,22 @@ function MongoBuffer:destory()
     if not bufnr then return end
 
     self._instance_map[bufnr] = nil
+    self.is_destroied = true
+end
+
+-- is_valid returns `true` if a buffer is not discarded yet.
+---@return boolean
+function MongoBuffer:is_valid()
+    if self.is_destroied then
+        return false
+    end
+
+    local bufnr = self:get_bufnr()
+    if bufnr then
+        return vim.api.nvim_buf_is_valid(bufnr)
+    else
+        return self.dummy_lines ~= nil
+    end
 end
 
 -- get_bufnr returns buffer number of the buffer this object is binded to.
