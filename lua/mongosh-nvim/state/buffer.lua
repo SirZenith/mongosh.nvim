@@ -455,6 +455,8 @@ local buffer_refresher_map = {
 ---@field is_user_buffer boolean # Whether this buffer is created by user
 --
 ---@field bufnr integer # buffer number of this buffer.
+---@field lines? string[] # for dummy buffer, this will be its content.
+--
 ---@field src_bufnr? integer # source buffer that create this buffer.
 ---@field result_bufnr? integer # result buffer used to display executation result of this buffer.
 ---@field state_args table<string, any> # state values bind with this buffer.
@@ -535,8 +537,6 @@ end
 function MongoBuffer:setup_buf_options()
     if self.is_user_buffer then return end
 
-    log.trace(self.type)
-
     local setter = buffer_option_setup_func_map[self.type]
     if not setter then
         local type = BufferType.Unknown
@@ -548,7 +548,6 @@ end
 
 -- destory does clean up on buffer gets unloaded
 function MongoBuffer:destory()
-    log.trace("mongo buffer unload: " .. tostring(self.bufnr))
     self._instance_map[self.bufnr] = nil
 end
 
