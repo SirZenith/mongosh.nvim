@@ -144,9 +144,9 @@ https://github.com/SirZenith/mongosh.nvim/blob/main/lua/mongosh-nvim/config.lua
 User config table should be passed to plugin by
 
 >lua
-require "mongosh-nvim".setup {
-    -- your config here
-}
+    require "mongosh-nvim".setup {
+        -- your config here
+    }
 <
 
 User config will be merge into default config. Options that not provided by
