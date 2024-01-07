@@ -1,11 +1,9 @@
 local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
-local script_const = require "mongosh-nvim.constant.mongosh_script"
 local log = require "mongosh-nvim.log"
 local api_core = require "mongosh-nvim.api.core"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
 local buffer_state = require "mongosh-nvim.state.buffer"
-local str_util = require "mongosh-nvim.util.str"
 
 local BufferType = buffer_const.BufferType
 
@@ -22,6 +20,8 @@ function M.refresh_buffer(bufnr)
         log.warn("current buffer is not refreshable")
     end
 end
+
+-- ----------------------------------------------------------------------------
 
 -- select_database selects a database among available ones.
 ---@param db_name string
@@ -135,50 +135,31 @@ function M.select_collection_ui_list()
         { prompt = "Select a collection" },
         function(collection)
             if collection == nil then return end
-
-            local content = str_util.format(script_const.SNIPPET_QUERY, {
-                collection = collection,
-            })
-
-            buffer_state.create_mongo_buffer(
-                BufferType.query,
-                vim.split(content, "\n", { plain = true })
-            )
+            M.create_query_buffer(collection)
         end
     )
+end
+
+-- ----------------------------------------------------------------------------
+
+-- create_query_buffer creates a new query buffer for given collection name.
+---@param collection string # collection name
+function M.create_query_buffer(collection)
+    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.CollectionList, {})
+    mbuf:write_result {
+        collection = collection,
+    }
 end
 
 -- create_edit_buffer creates a new buffer with editing snippet for given document.
 ---@param collection string # collection name
 ---@param id string # `_id` of target document
 function M.create_edit_buffer(collection, id)
-    local query = str_util.format(script_const.TEMPLATE_FIND_ONE, {
+    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.QueryResult, {})
+    mbuf:write_result {
         collection = collection,
         id = id,
-    })
-
-    api_core.do_query(query, function(err, result)
-        if err then
-            log.warn(err)
-            return
-        end
-
-        local document = str_util.indent(result, config.indent_size)
-
-        local snippet = str_util.format(script_const.SNIPPET_EDIT, {
-            collection = collection,
-            id = id,
-            document = document,
-        })
-
-        local lines = vim.split(snippet, "\n", { plain = true })
-        local mbuf = buffer_state.create_mongo_buffer(BufferType.Edit, lines)
-
-        mbuf.state_args = {
-            collection = collection,
-            id = id,
-        }
-    end, "failed to update document content")
+    }
 end
 
 -- ----------------------------------------------------------------------------
@@ -206,6 +187,14 @@ function M.run_buffer_executation(bufnr, args)
     end
 end
 
+-- run_executation executes given snippet and show result in buffer.
+---@param lines string[]
+---@param args mongo.ExecuteBufferArgs
+function M.run_executation(lines, args)
+    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.Execute, lines)
+    mbuf:write_result(args)
+end
+
 ---@class mongo.RunBufferQueryArgs
 ---@field with_range boolean
 
@@ -229,6 +218,14 @@ function M.run_buffer_query(bufnr, args)
     else
         log.warn("current buffer doesn't support Query command")
     end
+end
+
+-- run_query runs given query and show result in buffer.
+---@param lines string[]
+---@param args mongo.RunBufferQueryArgs
+function M.run_query(lines, args)
+    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.Query, lines)
+    mbuf:write_result(args)
 end
 
 ---@class mongo.RunBufferEditArgs
@@ -255,6 +252,14 @@ function M.run_buffer_edit(bufnr, args)
     else
         log.warn("current buffer doesn't support Edit command")
     end
+end
+
+-- run_edit runs given replace snippet and show result in buffer.
+---@param lines string[]
+---@param args mongo.RunBufferEditArgs
+function M.run_edit(lines, args)
+    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.Edit, lines)
+    mbuf:write_result(args)
 end
 
 return M

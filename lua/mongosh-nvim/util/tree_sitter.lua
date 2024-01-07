@@ -46,11 +46,9 @@ function M.get_collection_name(src)
     return result
 end
 
--- find_nearest_id tries to find `_id` field value of document around cursor.
+-- find_nearest_id_in_buffer tries to find `_id` field value of document around cursor.
 ---@param bufid? integer
-function M.find_nearest_id(bufid)
-    bufid = bufid or vim.fn.bufnr("%")
-
+function M.find_nearest_id_in_buffer(bufid)
     local parser = ts.get_parser(bufid)
     local tree = parser:parse()[1]
 

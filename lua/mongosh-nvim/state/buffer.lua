@@ -76,11 +76,13 @@ end
 
 -- ----------------------------------------------------------------------------
 
----@type table<mongo.CreateBufferStyle, fun(mbuf: mongo.MongoBuffer)>
+---@type table<mongo.BufferType, fun(mbuf: mongo.MongoBuffer)>
 local buffer_option_setup_func_map = {
     -- fallback style
     [BufferType.Unknown] = function(mbuf)
-        local bufnr = mbuf.bufnr
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
         local bo = vim.bo[bufnr]
 
         bo.bufhidden = "delete"
@@ -88,7 +90,9 @@ local buffer_option_setup_func_map = {
         bo.buftype = "nofile"
     end,
     [BufferType.CollectionList] = function(mbuf)
-        local bufnr = mbuf.bufnr
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
         local bo = vim.bo[bufnr]
 
         bo.bufhidden = "delete"
@@ -101,7 +105,9 @@ local buffer_option_setup_func_map = {
         end, { buffer = bufnr })
     end,
     [BufferType.Query] = function(mbuf)
-        local bufnr = mbuf.bufnr
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
         local bo = vim.bo[bufnr]
 
         bo.bufhidden = "delete"
@@ -111,7 +117,9 @@ local buffer_option_setup_func_map = {
         bo.filetype = "typescript"
     end,
     [BufferType.QueryResult] = function(mbuf)
-        local bufnr = mbuf.bufnr
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
         local bo = vim.bo[bufnr]
 
         bo.bufhidden = "delete"
@@ -121,7 +129,9 @@ local buffer_option_setup_func_map = {
         bo.filetype = "json"
     end,
     [BufferType.Edit] = function(mbuf)
-        local bufnr = mbuf.bufnr
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
         local bo = vim.bo[bufnr]
 
         bo.bufhidden = "delete"
@@ -131,7 +141,9 @@ local buffer_option_setup_func_map = {
         bo.filetype = "typescript"
     end,
     [BufferType.EditResult] = function(mbuf)
-        local bufnr = mbuf.bufnr
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
         local bo = vim.bo[bufnr]
 
         bo.bufhidden = "delete"
@@ -163,7 +175,13 @@ local result_buffer_getter_map = {
     end,
     -- Never create dedicated result buffer, always write result to current buffer
     [CreateBufferStyle.Never] = function(mbuf)
-        return mbuf.bufnr
+        local buf = mbuf:get_bufnr()
+        if not buf
+            or not api.nvim_buf_is_valid(buf)
+        then
+            buf = api.nvim_create_buf(false, false)
+        end
+        return buf
     end,
 }
 
@@ -208,20 +226,21 @@ local result_win_maker_map = {
 -- generator cannot make result buffer.
 ---@type table<mongo.BufferType, mongo.ResultGenerator>
 local result_generator_map = {
-    [BufferType.CollectionList] = function(mbuf, _, callback)
-        local bufnr = mbuf.bufnr
-        local win = get_win_by_buf(bufnr, true)
-        if not win then
-            callback {}
-            return
+    [BufferType.CollectionList] = function(mbuf, args, callback)
+        local collection = args.collection
+        if not collection then
+            local bufnr = mbuf:get_bufnr()
+            local win = bufnr and get_win_by_buf(bufnr, true)
+            local pos = win and api.nvim_win_get_cursor(win)
+
+            local row = pos and pos[1]
+            local lines = row and api.nvim_buf_get_lines(bufnr, row - 1, row, true)
+
+            collection = lines and lines[1]
         end
 
-        local pos = api.nvim_win_get_cursor(win)
-        local row = pos[1] or 1
-        local lines = api.nvim_buf_get_lines(bufnr, row - 1, row, true)
-
         local content = str_util.format(script_const.SNIPPET_QUERY, {
-            collection = lines[1],
+            collection = collection,
         })
 
         callback {
@@ -278,18 +297,22 @@ local result_generator_map = {
             }
         end)
     end,
-    [BufferType.QueryResult] = function(mbuf, _, callback)
-        local bufnr = mbuf.bufnr
-
-        local collection = mbuf.state_args.collection or mongosh_state.get_cur_collection()
+    [BufferType.QueryResult] = function(mbuf, args, callback)
+        local collection = args.collection
+            or mbuf.state_args.collection
+            or mongosh_state.get_cur_collection()
         if collection == nil then
             log.warn("collection required")
             callback {}
             return
         end
 
-        local id = ts_util.find_nearest_id(bufnr)
-        id = id and str_util.unquote(id)
+        local bufnr = mbuf:get_bufnr()
+        local id = args.id
+        if not id and bufnr then
+            id = ts_util.find_nearest_id_in_buffer(bufnr)
+            id = id and str_util.unquote(id)
+        end
         if id == nil then
             log.warn("id required")
             callback {}
@@ -455,7 +478,7 @@ local buffer_refresher_map = {
 ---@field is_user_buffer boolean # Whether this buffer is created by user
 --
 ---@field bufnr integer # buffer number of this buffer.
----@field lines? string[] # for dummy buffer, this will be its content.
+---@field dummy_lines? string[] # for dummy buffer, this will be its content.
 --
 ---@field src_bufnr? integer # source buffer that create this buffer.
 ---@field result_bufnr? integer # result buffer used to display executation result of this buffer.
@@ -505,6 +528,29 @@ function MongoBuffer:new(type, src_bufnr, result_bufnr, bufnr)
     return obj
 end
 
+-- new_dummy creates a new mongo buffer with no actual underlying buffer.
+-- With content binded with this buffer object, it can still make `write_result`
+-- call, etc.
+-- Dummy buffer objects are not registered to global mongo buffer map.
+---@param type mongo.BufferType
+---@param lines string[]
+---@return mongo.MongoBuffer
+function MongoBuffer:new_dummy(type, lines)
+    local obj = setmetatable({}, self)
+
+    obj.is_user_buffer = false
+
+    obj.bufnr = 0
+    obj.dummy_lines = vim.deepcopy(lines)
+
+    obj.type = type
+    obj.state_args = {}
+
+    obj:init_style()
+
+    return obj
+end
+
 -- init_style initialize result managing style for this buffer object.
 function MongoBuffer:init_style()
     self.create_win_style = config.result_buffer.split_style
@@ -519,12 +565,15 @@ end
 
 -- init_autocmd setups autocommand listening for this buffer.
 function MongoBuffer:init_autocmd()
+    local bufnr = self:get_bufnr()
+    if not bufnr then return end
+
     api.nvim_create_autocmd(
         { "BufUnload" },
         {
-            buffer = self.bufnr,
+            buffer = bufnr,
             callback = function()
-                if api.nvim_get_current_buf() ~= self.bufnr then
+                if api.nvim_get_current_buf() ~= bufnr then
                     return
                 end
 
@@ -535,6 +584,8 @@ function MongoBuffer:init_autocmd()
 end
 
 function MongoBuffer:setup_buf_options()
+    if not self:get_bufnr() then return end
+
     if self.is_user_buffer then return end
 
     local setter = buffer_option_setup_func_map[self.type]
@@ -548,11 +599,23 @@ end
 
 -- destory does clean up on buffer gets unloaded
 function MongoBuffer:destory()
-    self._instance_map[self.bufnr] = nil
+    local bufnr = self:get_bufnr()
+    if not bufnr then return end
+
+    self._instance_map[bufnr] = nil
+end
+
+-- get_bufnr returns buffer number of the buffer this object is binded to.
+-- Returns `nil` if this object is a dummy mongo buffer.
+---@return integer? bufnr
+function MongoBuffer:get_bufnr()
+    return self.bufnr > 0 and self.bufnr or nil
 end
 
 function MongoBuffer:show()
-    local bufnr = self.bufnr
+    local bufnr = self:get_bufnr()
+    if not bufnr then return end
+
     local win = get_win_by_buf(bufnr, true)
     if win then return end
 
@@ -581,22 +644,38 @@ end
 -- get_lines returns content of current buffer in an array of text lines.
 ---@return string[] lines
 function MongoBuffer:get_lines()
-    local bufnr = self.bufnr
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, vim.api.nvim_buf_line_count(bufnr), true)
+    local bufnr = self:get_bufnr()
+
+    local lines
+    if bufnr then
+        lines = vim.api.nvim_buf_get_lines(bufnr, 0, vim.api.nvim_buf_line_count(bufnr), true)
+    elseif self.dummy_lines then
+        lines = vim.deepcopy(self.dummy_lines) --[=[@as string[]]=]
+    else
+        lines = {}
+    end
+
     return lines
 end
 
 -- set_lines writes given lines to current buffer, overwriting existing content
 -- in buffer.
+---@param lines string[]
 function MongoBuffer:set_lines(lines)
-    local bufnr = self.bufnr
-    api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
+    local bufnr = self:get_bufnr()
+    if bufnr then
+        api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
+    else
+        self.dummy_lines = vim.deepcopy(lines)
+    end
 end
 
 -- get_visual_selection returns visual selected text in current buffer.
 ---@return string[]
 function MongoBuffer:get_visual_selection()
-    local bufnr = self.bufnr
+    local bufnr = self:get_bufnr()
+    if not bufnr then return {} end
+
     local cur_bufnr = api.nvim_win_get_buf(0)
     if bufnr ~= cur_bufnr then return {} end
 
@@ -646,15 +725,17 @@ function MongoBuffer:make_result_buffer_obj()
 
     api.nvim_win_set_buf(win, buf)
 
+    local cur_buf = self:get_bufnr()
+
     -- it's possible buf_obj here is `self`, make sure following setup override
     -- all necessary field in buf_obj
     local buf_obj = self.get_buffer_obj(buf)
     if not buf_obj then
         buf_obj = MongoBuffer:new(BufferType.Unknown, nil, nil, buf)
-        buf_obj.is_user_buffer = buf == self.bufnr and self.is_user_buffer
+        buf_obj.is_user_buffer = buf == cur_buf and self.is_user_buffer
     end
 
-    buf_obj.src_bufnr = buf ~= self.bufnr and self.bufnr or nil
+    buf_obj.src_bufnr = buf ~= cur_buf and cur_buf or nil
     buf_obj.result_bufnr = nil
 
     return nil, buf_obj
@@ -704,9 +785,8 @@ function MongoBuffer:write_result(args)
 
         buf_obj:setup_buf_options()
 
-        self.result_bufnr = buf_obj.bufnr ~= self.bufnr
-            and buf_obj.bufnr
-            or nil
+        local new_buf = buf_obj:get_bufnr()
+        self.result_bufnr = new_buf ~= self:get_bufnr() and new_buf or nil
     end)
 end
 
@@ -738,6 +818,14 @@ function M.create_mongo_buffer(type, lines)
     mbuf:show()
 
     return mbuf
+end
+
+-- create_dummy_mongo_buffer makes a new dummy mongo buffer with given content.
+---@param type mongo.BufferType
+---@param lines string[]
+---@return mongo.MongoBuffer
+function M.create_dummy_mongo_buffer(type, lines)
+    return MongoBuffer:new_dummy(type, lines)
 end
 
 -- wrap_with_mongo_buffer creates a MongoBuffer object for given buffer.
