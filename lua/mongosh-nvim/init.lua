@@ -14,7 +14,7 @@ function M.setup(options)
         vim.tbl_extend("force", config, options)
     end
 
-    if vim.fn.executable(config.executable) then
+    if vim.fn.executable(config.executable) == 0 then
         log.warn("mongosh executable not found")
         config.executable = nil
     end
