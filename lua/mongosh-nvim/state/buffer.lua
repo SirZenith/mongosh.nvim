@@ -376,6 +376,22 @@ local result_generator_map = {
     end,
 }
 
+-- map buffer type to clean up function which gets called after writing result.
+-- If source buffer share the same buffer with result buffer, `src_buf` in function
+-- argument will be `nil`.
+---@type table<mongo.BufferType, fun(src_buf?: mongo.MongoBuffer, result_buf: mongo.MongoBuffer)>
+local after_write_result_map = {
+    [BufferType.CollectionList] = function(src_buf)
+        local bufnr = src_buf and src_buf:get_bufnr()
+        if not bufnr then return end
+
+        local win = get_win_by_buf(bufnr, true)
+        if not win then return end
+
+        api.nvim_win_hide(win)
+    end
+}
+
 -- map buffer type to buffer refreshing function
 ---@type table<mongo.BufferType, fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))>
 local buffer_refresher_map = {
@@ -773,6 +789,12 @@ function MongoBuffer:write_result(args)
             return
         end
 
+        local new_buf = buf_obj:get_bufnr()
+        local no_buf_reuse = new_buf ~= self:get_bufnr()
+        local src_buf_type = self.type
+
+        -- update steate
+
         buf_obj.type = result.type
 
         local content = result.content
@@ -785,8 +807,15 @@ function MongoBuffer:write_result(args)
 
         buf_obj:setup_buf_options()
 
-        local new_buf = buf_obj:get_bufnr()
-        self.result_bufnr = new_buf ~= self:get_bufnr() and new_buf or nil
+        self.result_bufnr = no_buf_reuse and new_buf or nil
+
+        -- after write clean up
+
+        local after_write = after_write_result_map[src_buf_type]
+        if after_write then
+            local src_buf = no_buf_reuse and self or nil
+            after_write(src_buf, buf_obj)
+        end
     end)
 end
 
