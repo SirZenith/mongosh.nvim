@@ -311,7 +311,6 @@ local result_generator_map = {
         local id = args.id
         if not id and bufnr then
             id = ts_util.find_nearest_id_in_buffer(bufnr)
-            id = id and str_util.unquote(id)
         end
         if id == nil then
             log.warn("id required")

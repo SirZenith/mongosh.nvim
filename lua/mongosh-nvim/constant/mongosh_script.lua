@@ -28,7 +28,7 @@ print(json)
 
 -- query template for finding one document with `_id`
 M.TEMPLATE_FIND_ONE = [[
-db["${collection}"].findOne({ _id: EJSON.deserialize("${id}") })
+db["${collection}"].findOne({ _id: EJSON.deserialize(${id}) })
 ]]
 
 -- editing template for replaceOne call, user should define following variable
@@ -55,7 +55,7 @@ db["${collection}"].find({})
 M.SNIPPET_EDIT = [[
 // Edit document value here
 const collection = "${collection}"
-const id = "${id}"
+const id = ${id}
 const replacement = EJSON.deserialize(
 ${document}
 )
