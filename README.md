@@ -2,6 +2,8 @@
 
 This plugin is inspired by [jrop/mongo.nvim](https://github.com/jrop/mongo.nvim).
 
+<b>Notice</b>: still in early stage of development, might be breaking change.
+
 ---
 
 This is a frontend for mongosh. It provides your the ability to send script to
