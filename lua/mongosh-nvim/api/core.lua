@@ -214,6 +214,7 @@ end
 
 ---@class mongo.ConnectArgs
 ---@field host string
+---@field port? number
 --
 ---@field username? string
 ---@field password? string
@@ -229,6 +230,7 @@ function M.connect(args, callback)
         return
     end
 
+    mongosh_state.set_cur_port(args.port)
     mongosh_state.set_username(args.username)
     mongosh_state.set_password(args.password)
 

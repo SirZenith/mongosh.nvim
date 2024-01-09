@@ -6,6 +6,7 @@ local M = {}
 
 -- address last connected host
 local cur_host = nil ---@type string?
+local cur_port = nil ---@type number?
 
 -- name list of all available databases
 local db_names = nil ---@type string[]?
@@ -38,6 +39,21 @@ end
 function M.get_cur_host()
     if not cur_host or cur_host:len() == 0 then return nil end
     return str_util.unscramble(cur_host)
+end
+
+-- set_cur_port sets port number for current connection.
+---@param value? number
+function M.set_cur_port(value)
+    cur_port = value or 0
+    M.reset_db_cache()
+end
+
+-- get_cur_port returns port of current connection. If no special port is specified
+-- `nil` will be returned.
+---@return number? port
+function M.get_cur_port()
+    if not cur_port or cur_port <= 0 then return nil end
+    return cur_port
 end
 
 -- set_db_names update cached database name list.
