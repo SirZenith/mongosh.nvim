@@ -64,6 +64,8 @@ local function consume_flag_arg(args, cur_index, flag_stem)
     return new_index, key, value
 end
 
+---@alias mongo.RawParsedArgs table<string | number, string | boolean | nil>
+
 -- parsed_args takes f-args list and translate flags and positional args into Lua
 -- table.
 -- Flags will be translate into key-value pairs, positional will be translated
@@ -79,7 +81,7 @@ end
 -- }
 -- ```
 ---@param args string[]
----@return table<string | number, string | boolean | nil>
+---@return mongo.RawParsedArgs
 local function parse_fargs(args)
     local parsed_args = {}
 
@@ -194,17 +196,19 @@ local arg_value_converter_map = {
 ---@class mongo.CommandArg
 ---@field name string
 ---@field short? string
----@field is_flag? boolean
+---@field is_flag? boolean # indicating an argument is used as flag
+---@field is_list? boolean # indicating a positional argument matches multiple value, and implies type `string[]`, can't be used with `is_flag`.
 ---@field type? mongo.CommandArgType
 ---@field default? any
 ---@field required? boolean
 
----@alias mongo.CommandActionCallback fun(args: table<string, string | nil>, orig_args: table)
+---@alias mongo.CommandActionCallback fun(args: table<string, any>, orig_args: table, unused_args: mongo.RawParsedArgs)
 
 ---@class mongo.Command
 ---@field name string
 ---@field range boolean # Does the command support range.
 ---@field buffer? number # If `buffer` has non `nil` value, command will be local to buffer.
+---@field no_unused_warning? boolean # if `ture`, unused argument warnning will be ignored
 --
 ---@field action mongo.CommandActionCallback
 ---@field arg_list mongo.CommandArg[]
@@ -217,6 +221,7 @@ function Command:new(args)
 
     obj.name = args.name or ""
     obj.range = args.range or false
+    obj.no_unused_warning = args.no_unused_warning
 
     obj.action = args.action or function() end
 
@@ -251,6 +256,17 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
             value = value or raw_parsed[short]
             raw_parsed[short] = nil
         end
+    elseif arg_spec.is_list then
+        value = {}
+        cur_pos_index = cur_pos_index + 1
+        local end_pos = #raw_parsed
+
+        for i = cur_pos_index, end_pos do
+            value[#value + 1] = raw_parsed[i]
+            raw_parsed[i] = nil
+        end
+
+        cur_pos_index = end_pos
     else
         cur_pos_index = cur_pos_index + 1
         value = raw_parsed[cur_pos_index]
@@ -268,7 +284,9 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
         end
     end
 
-    if value ~= nil then
+    if type(value) == "table" then
+        -- pass
+    elseif value ~= nil then
         local arg_type = arg_spec.type or "string"
         local converter = arg_value_converter_map[arg_type]
         value = converter and converter(value) or value
@@ -334,12 +352,15 @@ function Command:_make_command_callback()
             return
         end
 
-        local unused_value_msg = self:_check_unused_args(raw_parsed)
-        if unused_value_msg then
-            log.info(unused_value_msg)
+        local unused_args = raw_parsed
+        if not self.no_unused_warning then
+            local unused_value_msg = self:_check_unused_args(unused_args)
+            if unused_value_msg then
+                log.info(unused_value_msg)
+            end
         end
 
-        self.action(parsed_args, args)
+        self.action(parsed_args, args, unused_args)
     end
 end
 
@@ -387,6 +408,7 @@ end
 ---@field name string
 ---@field range? boolean
 ---@field buffer? number
+---@field no_unused_warning? boolean
 --
 ---@field arg_list? mongo.CommandArg[]
 ---@field action mongo.CommandActionCallback

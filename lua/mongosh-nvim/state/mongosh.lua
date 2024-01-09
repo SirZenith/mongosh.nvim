@@ -1,31 +1,34 @@
+local str_util = require "mongosh-nvim.util.str"
+
 local M = {}
 
 -- ----------------------------------------------------------------------------
 
 -- address last connected host
-local cur_host = nil ---@type string | nil
+local cur_host = nil ---@type string?
 
 -- name list of all available databases
-local db_names = nil ---@type string[] | nil
+local db_names = nil ---@type string[]?
 -- name of selected database
-local cur_db = nil ---@type string | nil
+local cur_db = nil ---@type string?
 
 -- name list of all available collections
-local collection_names = {} ---@type string[] | nil
+local collection_names = {} ---@type string[]?
 -- name of selected collections
-local cur_collection = nil ---@type string | nil
+local cur_collection = nil ---@type string?
 
-local username = nil ---@type string | nil
-local password = nil ---@type string | nil
+local raw_flag_map = {} ---@type table<string, string>
 
-local api_version = nil ---@type string | nil
+local username = nil ---@type string?
+local password = nil ---@type string?
 
 -- ----------------------------------------------------------------------------
+-- Connection state
 
 -- set_host update cached last connected host address
 ---@param host string
 function M.set_cur_host(host)
-    cur_host = host
+    cur_host = str_util.scramble(host)
     M.reset_db_cache()
 end
 
@@ -33,9 +36,8 @@ end
 -- If no host is ever connected to, `nil` will be returned.
 ---@return string? host_addr
 function M.get_cur_host()
-    if not cur_host then return nil end
-
-    return cur_host
+    if not cur_host or cur_host:len() == 0 then return nil end
+    return str_util.unscramble(cur_host)
 end
 
 -- set_db_names update cached database name list.
@@ -121,36 +123,63 @@ function M.get_cur_collection()
     return cur_collection
 end
 
+-- ----------------------------------------------------------------------------
+
+-- clear_all_raw_flags deletes all connection raw flag value.
+function M.clear_all_raw_flags()
+    raw_flag_map = {}
+end
+
+-- set_raw_flag sets value for a flag, set flag to value `nil` will delte this flag.
+---@param flag string # flag key, e.g. --foo, -b
+---@param value string?
+function M.set_raw_flag(flag, value)
+    raw_flag_map[flag] = value
+end
+
+-- get_raw_flag returns stored value of a given flag.
+---@return string? value
+function M.get_raw_flag(flag)
+    return raw_flag_map[flag]
+end
+
+-- get_raw_flag returns a copy of raw flag table.
+---@return table<string, string>
+function M.get_raw_flag_map()
+    return vim.deepcopy(raw_flag_map)
+end
+
+-- ----------------------------------------------------------------------------
+-- Authentication
+
 -- set_username updates user name for current connection. If input value is `nil`
 -- or empty string, this function does nothing.
 ---@param value? string
 function M.set_username(value)
-    if not value or value:len() == 0 then return end
-    username = value
+    username = str_util.scramble(value or "")
 end
 
 -- get_username returns user name for current connection. If no user name is used
 -- for connection, `nil` will be returned.
 ---@return string? username
 function M.get_username()
-    if not username or username:len() == 0 then return end
-    return username
+    if not username or username:len() == 0 then return nil end
+    return str_util.unscramble(username)
 end
 
 -- set_password updates password for current connection. If input value is `nil`
 -- or empty string, this function does nothing.
 ---@param value? string
 function M.set_password(value)
-    if not value or value:len() == 0 then return end
-    password = value;
+    password = str_util.scramble(value or "");
 end
 
 -- get_password returns password for current connection. If no password is used
 -- for connection, `nil` will be returned.
 ---@return string? password
 function M.get_password()
-    if not password or password:len() == 0 then return end
-    return password
+    if not password or password:len() == 0 then return nil end
+    return str_util.unscramble(password)
 end
 
 -- ----------------------------------------------------------------------------

@@ -9,6 +9,18 @@ local loop = vim.loop
 
 local M = {}
 
+-- try_append_flag appends flag-value pair to argument buffer list if value is
+-- not `nil`.
+---@param buffer string[]
+---@param flag string
+---@param value string?
+local function try_append_flag(buffer, flag, value)
+    if value == nil then return end
+
+    buffer[#buffer + 1] = flag
+    buffer[#buffer + 1] = value
+end
+
 -- ----------------------------------------------------------------------------
 
 local cached_tmpfile_name = nil ---@type string | nil
@@ -34,17 +46,14 @@ end
 function M.get_connection_args()
     local args = {}
 
-    local username = mongosh_state.get_username()
-    if username then
-        args[#args + 1] = "--username"
-        args[#args + 1] = username
+    local raw_flag_map = mongosh_state.get_raw_flag_map()
+    for flag, value in pairs(raw_flag_map) do
+        args[#args + 1] = flag
+        args[#args + 1] = value
     end
 
-    local password = mongosh_state.get_password()
-    if password then
-        args[#args + 1] = "--password"
-        args[#args + 1] = password
-    end
+    try_append_flag(args, "--username", mongosh_state.get_username())
+    try_append_flag(args, "--password", mongosh_state.get_password())
 
     return args
 end
@@ -164,14 +173,50 @@ end
 
 -- ----------------------------------------------------------------------------
 
+-- set_connection_flags_by_list treats every two arguments in input list as
+-- flag-value pair, and sotre as raw connection flag.
+-- Extra flag with no paired value takes no effect on internal flag sotrage.
+---@param args string[]
+function M.set_connection_flags_by_list(args)
+    local len = #args
+
+    if len == 0 then
+        mongosh_state.clear_all_raw_flags()
+        return
+    end
+
+    for i = 1, len, 2 do
+        local flag, value = args[i], args[i + 1]
+        if value ~= nil then
+            mongosh_state.set_raw_flag(flag, value)
+        end
+    end
+end
+
+-- set_connection_flags_by_table update connection raw flags with given table.
+---@param args table<string, string>
+function M.set_connection_flags_by_table(args)
+    for flag, value in pairs(args) do
+        mongosh_state.set_raw_flag(flag, value)
+    end
+end
+
+-- get_connection_flags returns a copy stored connection raw flag map.
+---@return table<string, string>
+function M.get_connection_flags()
+    return mongosh_state.get_raw_flag_map()
+end
+
+-- clear_connection_flags clears all stored connection raw falgs.
+function M.clear_connection_flags()
+    mongosh_state.clear_all_raw_flags()
+end
+
 ---@class mongo.ConnectArgs
 ---@field host string
----@field port? string
 --
 ---@field username? string
 ---@field password? string
---
----@field api_version? string
 
 -- connect connects to give host, and get list of available database name from host.
 -- Host will be default to `default_host` provided in configuration.

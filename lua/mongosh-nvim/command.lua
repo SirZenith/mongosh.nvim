@@ -10,23 +10,39 @@ local api_ui = require "mongosh-nvim.api.ui"
 
 cmd_util.register_cmd {
     name = "MongoConnect",
+    no_unused_warning = true,
     arg_list = {
-        { name = "host",        is_flag = true },
-        { name = "port",        is_flag = true },
-        { name = "db",          is_flag = true },
-        { name = "with-auth",   is_flag = true, type = "boolean" },
-        { name = "api-version", is_flag = true },
+        { name = "host",           is_flag = true },
+        { name = "db",             is_flag = true },
+        { name = "with-auth",      is_flag = true, type = "boolean" },
     },
-    action = function(args)
+    action = function(args, _, unused_args)
+        -- update raw connection flags
+        api_core.clear_connection_flags()
+        local raw_flags = {}
+        for key, value in pairs(unused_args) do
+            local flag
+            if type(key) == "string" and type(value) == "string" then
+                local len = key:len()
+                if len == 0 then
+                    -- pass
+                elseif len == 1 then
+                    flag = "-" .. key
+                else
+                    flag = "--" .. key
+                end
+            end
+
+            if flag then
+                raw_flags[flag] = value
+            end
+        end
+        api_core.set_connection_flags_by_table(raw_flags)
+
+        -- try connecting
         ---@type mongo.ConnectArgs
         local connect_args = {
             host = args.host or config.connection.default_host,
-            port = args.port,
-
-            username = "",
-            password = "",
-
-            api_version = args.api_version,
         }
 
         util.do_async_steps {
