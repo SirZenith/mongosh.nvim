@@ -78,7 +78,11 @@ function M.select_database_ui()
         { prompt = "Select a database:" },
         function(db)
             mongosh_state.set_cur_db(db)
-            api_core.update_collection_list()
+            api_core.update_collection_list(function(err)
+                if err then
+                    log.warn(err)
+                end
+            end)
         end
     )
 end

@@ -1,4 +1,5 @@
 local config = require "mongosh-nvim.config"
+local log = require "mongosh-nvim.log"
 local util = require "mongosh-nvim.util"
 local cmd_util = require "mongosh-nvim.util.command"
 
@@ -56,8 +57,9 @@ cmd_util.register_cmd {
 
             -- connecting
             function(next_step)
-                api_core.connect(connect_args, function(ok)
-                    if not ok then
+                api_core.connect(connect_args, function(err)
+                    if err then
+                        log.warn(err)
                         next_step()
                         return
                     end

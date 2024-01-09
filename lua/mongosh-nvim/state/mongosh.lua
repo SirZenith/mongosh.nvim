@@ -15,6 +15,11 @@ local collection_names = {} ---@type string[] | nil
 -- name of selected collections
 local cur_collection = nil ---@type string | nil
 
+local username = nil ---@type string | nil
+local password = nil ---@type string | nil
+
+local api_version = nil ---@type string | nil
+
 -- ----------------------------------------------------------------------------
 
 -- set_host update cached last connected host address
@@ -114,6 +119,38 @@ end
 ---@return string? collection_name
 function M.get_cur_collection()
     return cur_collection
+end
+
+-- set_username updates user name for current connection. If input value is `nil`
+-- or empty string, this function does nothing.
+---@param value? string
+function M.set_username(value)
+    if not value or value:len() == 0 then return end
+    username = value
+end
+
+-- get_username returns user name for current connection. If no user name is used
+-- for connection, `nil` will be returned.
+---@return string? username
+function M.get_username()
+    if not username or username:len() == 0 then return end
+    return username
+end
+
+-- set_password updates password for current connection. If input value is `nil`
+-- or empty string, this function does nothing.
+---@param value? string
+function M.set_password(value)
+    if not value or value:len() == 0 then return end
+    password = value;
+end
+
+-- get_password returns password for current connection. If no password is used
+-- for connection, `nil` will be returned.
+---@return string? password
+function M.get_password()
+    if not password or password:len() == 0 then return end
+    return password
 end
 
 -- ----------------------------------------------------------------------------

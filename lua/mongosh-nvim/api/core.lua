@@ -28,6 +28,27 @@ function M.save_tmp_script_file(script, callback)
     end)
 end
 
+-- get_connection_args returns basic argument, for example authentication info,
+-- for current connection.
+---@return string[]
+function M.get_connection_args()
+    local args = {}
+
+    local username = mongosh_state.get_username()
+    if username then
+        args[#args + 1] = "--username"
+        args[#args + 1] = username
+    end
+
+    local password = mongosh_state.get_password()
+    if password then
+        args[#args + 1] = "--password"
+        args[#args + 1] = password
+    end
+
+    return args
+end
+
 ---@class mongo.RunCmdResult
 ---@field code number
 ---@field signal number
@@ -103,13 +124,14 @@ function M.run_raw_script(args)
         return
     end
 
+    local exe_args = M.get_connection_args();
     M.call_mongosh {
-        args = {
+        args = vim.list_extend(exe_args, {
             "--quiet",
             "--eval",
             args.script,
             address,
-        },
+        }),
         callback = args.callback,
     }
 end
@@ -127,12 +149,14 @@ function M.run_script(args)
     end
 
     M.save_tmp_script_file(args.script, function(tmpfile_name)
+        local exe_args = M.get_connection_args()
+
         M.call_mongosh {
-            args = {
+            args = vim.list_extend(exe_args, {
                 "--quiet",
                 address,
                 tmpfile_name
-            },
+            }),
             callback = args.callback,
         }
     end)
@@ -142,27 +166,33 @@ end
 
 ---@class mongo.ConnectArgs
 ---@field host string
----@field port string
+---@field port? string
 --
----@field username string
----@field password string
+---@field username? string
+---@field password? string
 --
 ---@field api_version? string
 
 -- connect connects to give host, and get list of available database name from host.
 -- Host will be default to `default_host` provided in configuration.
 ---@param args mongo.ConnectArgs
----@param callback fun(ok: boolean)
+---@param callback fun(err?: string)
 function M.connect(args, callback)
-    local host = args.host or config.connection.default_host
+    local host = args.host
+    if not host then
+        callback("no host address given")
+        return
+    end
+
+    mongosh_state.set_username(args.username)
+    mongosh_state.set_password(args.password)
 
     M.run_raw_script {
         script = script_const.CMD_LIST_DBS,
         host = host,
         callback = function(result)
             if result.code ~= 0 then
-                log.warn("failed to connect to host")
-                callback(false)
+                callback("failed to connect to host\n" .. result.stderr)
                 return
             end
 
@@ -172,19 +202,19 @@ function M.connect(args, callback)
             table.sort(db_names)
             mongosh_state.set_db_names(db_names)
 
-            callback(true)
+            callback()
         end,
     }
 end
 
 -- get_collections get name list of all available collections in current data base
----@param callback? fun()
+---@param callback fun(err?: string)
 function M.update_collection_list(callback)
     M.run_raw_script {
         script = script_const.CMD_LIST_COLLECTIONS,
         callback = function(result)
             if result.code ~= 0 then
-                log.warn("failed to get collection list")
+                callback("failed to get collection list\n" .. result.stderr)
                 return
             end
 
@@ -192,9 +222,7 @@ function M.update_collection_list(callback)
             table.sort(collections)
             mongosh_state.set_collection_names(collections)
 
-            if callback then
-                callback()
-            end
+            callback()
         end,
     }
 end
