@@ -99,7 +99,7 @@ end
 function M.run_raw_script(args)
     local address = args.host or mongosh_state.get_cur_db_addr()
     if not address then
-        vim.notify("please connect to a database first", vim.log.levels.WARN)
+        vim.notify("no database is selected", vim.log.levels.WARN)
         return
     end
 

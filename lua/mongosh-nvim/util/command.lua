@@ -11,7 +11,7 @@ local M = {}
 -- - -foo -> foo
 -- - --foo -> foo
 -- - --foo=bar -> foo=bar
--- - --this-that -> this_that
+-- - --this-that -> this-that
 ---@param s string
 ---@return string?
 local function check_is_flag_arg(s)
@@ -37,9 +37,11 @@ end
 
 -- consume_flag_arg consumes a flag argument in argument list, returns next consume
 -- index and key, value of the flag.
+-- If current is followed by another flag immediately, then current will be of
+-- value `true` indicating is precense but with no actual value.
 ---@return integer new_index
 ---@return string key
----@return string value
+---@return string | boolean value
 local function consume_flag_arg(args, cur_index, flag_stem)
     local new_index = cur_index + 1
     local eq_st, eq_ed = flag_stem:find("=")
@@ -51,7 +53,12 @@ local function consume_flag_arg(args, cur_index, flag_stem)
     else
         key = flag_stem
         value = args[new_index]
-        new_index = new_index + 1
+
+        if not value or check_is_flag_arg(value) then
+            value = true
+        else
+            new_index = new_index + 1
+        end
     end
 
     return new_index, key, value
@@ -72,7 +79,7 @@ end
 -- }
 -- ```
 ---@param args string[]
----@return table<string | number, string | nil>
+---@return table<string | number, string | boolean | nil>
 local function parse_fargs(args)
     local parsed_args = {}
 
@@ -99,31 +106,15 @@ local function parse_fargs(args)
     return parsed_args
 end
 
--- validate_required_args checks if all required arguments have non-nil value.
----@param spec_list (string | nil)[][]
----@return string? err
-local function validate_required_args(spec_list)
-    local err
-
-    for _, spec in ipairs(spec_list) do
-        local value = spec[1]
-        local msg = spec[2]
-        if value == nil then
-            err = msg
-                and msg .. " is required"
-                or "required value is missing"
-            break
-        end
-    end
-
-    return err
-end
+-- ----------------------------------------------------------------------------
+-- Completion
 
 -- flag_completion is a simple completion function for command flags.
 ---@param flag_list string[] # e.g. { "-a", "--bar" }
 ---@param arg_lead string
+---@param cmd_line string
 ---@return string[]
-local function flag_completion(flag_list, arg_lead, _, _)
+local function flag_completion(flag_list, arg_lead, cmd_line, _)
     local result = {}
 
     for _, flag in ipairs(flag_list) do
@@ -135,6 +126,7 @@ local function flag_completion(flag_list, arg_lead, _, _)
             is_picked = flag:sub(1, 2) == "--"
         else
             is_picked = str_util.starts_with(flag, arg_lead)
+            is_picked = is_picked and cmd_line:find(flag) == nil
         end
 
         if is_picked then
@@ -170,11 +162,41 @@ end
 
 -- ----------------------------------------------------------------------------
 
+---@alias mongo.CommandArgType
+---| "number"
+---| "string"
+---| "boolean"
+
+---@type table<mongo.CommandArgType, fun(value: string | boolean): any | nil>
+local arg_value_converter_map = {
+    number = function(value)
+        return type(value) == "string" and tonumber(value) or 0
+    end,
+    string = function(value)
+        return type(value) == "string" and value or ""
+    end,
+    boolean = function(value)
+        if not value then return false end
+
+        if type(value) == "string" then
+            if value == "0"
+                or value:len() == 0
+                or value:lower() == "false"
+            then
+                return false
+            end
+        end
+
+        return true
+    end,
+}
+
 ---@class mongo.CommandArg
 ---@field name string
 ---@field short? string
 ---@field is_flag? boolean
----@field default? string
+---@field type? mongo.CommandArgType
+---@field default? any
 ---@field required? boolean
 
 ---@alias mongo.CommandActionCallback fun(args: table<string, string | nil>, orig_args: table)
@@ -204,21 +226,22 @@ function Command:new(args)
     return obj
 end
 
----@param raw_parsed table<string | number, string | nil>
+-- _extract_arg maps table of parsed
+---@param raw_parsed table<string | number, string | boolean | nil>
 ---@param arg_spec mongo.CommandArg
 ---@return string? err
----@return string? value
+---@return any value
 ---@return integer new_pos_index
 function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
     local err
-    local value = arg_spec.default
 
     local is_flag = arg_spec.is_flag
+    local value
     if is_flag then
-        value = raw_parsed[arg_spec.name] or raw_parsed[arg_spec.short] or value
+        value = raw_parsed[arg_spec.name] or raw_parsed[arg_spec.short]
     else
         cur_pos_index = cur_pos_index + 1
-        value = raw_parsed[cur_pos_index] or value
+        value = raw_parsed[cur_pos_index]
     end
 
     -- check required
@@ -232,10 +255,20 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
         end
     end
 
+    if value ~= nil then
+        local arg_type = arg_spec.type or "string"
+        local converter = arg_value_converter_map[arg_type]
+        value = converter and converter(value) or value
+    else
+        value = arg_spec.default
+    end
+
     return err, value, cur_pos_index
 end
 
-function Command:make_command_callback()
+-- _make_command_callback generates a uesr command callback with command's
+-- argument list and action.
+function Command:_make_command_callback()
     return function(args)
         local raw_parsed = parse_fargs(args.fargs)
         local parsed_args = {}
@@ -288,7 +321,7 @@ function Command:register()
         complete = arg_cnt > 0 and flag_completor_maker(self.arg_list) or nil,
     }
 
-    local callback = self:make_command_callback()
+    local callback = self:_make_command_callback()
 
     local buffer = self.buffer
     if buffer then

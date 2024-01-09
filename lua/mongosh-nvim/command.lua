@@ -1,4 +1,5 @@
 local config = require "mongosh-nvim.config"
+local util = require "mongosh-nvim.util"
 local cmd_util = require "mongosh-nvim.util.command"
 
 local api_core = require "mongosh-nvim.api.core"
@@ -12,12 +13,10 @@ cmd_util.register_cmd {
         { name = "host",        is_flag = true },
         { name = "port",        is_flag = true },
         { name = "db",          is_flag = true },
-        { name = "with-auth",   is_flag = true },
+        { name = "with-auth",   is_flag = true, type = "boolean" },
         { name = "api-version", is_flag = true },
     },
     action = function(args)
-        local db = args.db
-
         ---@type mongo.ConnectArgs
         local connect_args = {
             host = args.host or config.connection.default_host,
@@ -29,15 +28,51 @@ cmd_util.register_cmd {
             api_version = args.api_version,
         }
 
-        api_core.connect(connect_args, function(ok)
-            if not ok then return end
+        util.do_async_steps {
+            -- user name input
+            function(next_step)
+                if not args.with_auth then
+                    next_step()
+                    return
+                end
 
-            if db then
-                api_ui.select_database(db)
-            else
-                api_ui.select_database_ui()
-            end
-        end)
+                vim.ui.input({ prompt = "User Name: " }, function(input)
+                    connect_args.username = input
+                    next_step()
+                end)
+            end,
+
+            -- password input
+            function(next_step)
+                if not args.with_auth then
+                    next_step()
+                    return
+                end
+
+                local input = vim.fn.inputsecret("Password: ")
+                connect_args.password = input
+                next_step()
+            end,
+
+            -- connecting
+            function(next_step)
+                api_core.connect(connect_args, function(ok)
+                    if not ok then
+                        next_step()
+                        return
+                    end
+
+                    local db = args.db
+                    if db then
+                        api_ui.select_database(db)
+                    else
+                        api_ui.select_database_ui()
+                    end
+
+                    next_step()
+                end)
+            end,
+        }
     end,
 }
 
