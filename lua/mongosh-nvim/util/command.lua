@@ -226,7 +226,9 @@ function Command:new(args)
     return obj
 end
 
--- _extract_arg maps table of parsed
+-- _extract_arg takes value out of parsed argument table.
+-- This function modifies `raw_parsed`, argument key extracted will be removed
+-- from `raw_parsed`.
 ---@param raw_parsed table<string | number, string | boolean | nil>
 ---@param arg_spec mongo.CommandArg
 ---@return string? err
@@ -238,10 +240,21 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
     local is_flag = arg_spec.is_flag
     local value
     if is_flag then
-        value = raw_parsed[arg_spec.name] or raw_parsed[arg_spec.short]
+        local long = arg_spec.name
+        if long then
+            value = raw_parsed[long]
+            raw_parsed[long] = nil
+        end
+
+        local short = arg_spec.short
+        if short then
+            value = value or raw_parsed[short]
+            raw_parsed[short] = nil
+        end
     else
         cur_pos_index = cur_pos_index + 1
         value = raw_parsed[cur_pos_index]
+        raw_parsed[cur_pos_index] = nil
     end
 
     -- check required
@@ -266,6 +279,38 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
     return err, value, cur_pos_index
 end
 
+-- _check_unused_args is used after _extract_arg to generate prompt message for
+-- all unused arguments left in `raw_parsed`.
+---@param raw_parsed table<string | number, string | boolean | nil>
+---@return string? msg
+function Command:_check_unused_args(raw_parsed)
+    local positional_list = {} ---@type number[]
+    local flag_list = {} ---@type string[]
+
+    for key in pairs(raw_parsed) do
+        local key_t = type(key)
+        if key_t == "string" then
+            flag_list[#flag_list + 1] = key
+        elseif key_t == "number" then
+            positional_list[#positional_list + 1] = key
+        end
+    end
+
+    local msg = {}
+
+    if #positional_list > 0 then
+        table.sort(positional_list)
+        msg[#msg + 1] = "Unused positional argument(s): #" .. table.concat(positional_list, ", #")
+    end
+
+    if #flag_list > 0 then
+        table.sort(flag_list)
+        msg[#msg + 1] = "Unused flag(s): " .. table.concat(flag_list, ", ")
+    end
+
+    return #msg > 0 and table.concat(msg, "\n") or nil
+end
+
 -- _make_command_callback generates a uesr command callback with command's
 -- argument list and action.
 function Command:_make_command_callback()
@@ -287,6 +332,11 @@ function Command:_make_command_callback()
         if err then
             log.warn(err)
             return
+        end
+
+        local unused_value_msg = self:_check_unused_args(raw_parsed)
+        if unused_value_msg then
+            log.info(unused_value_msg)
         end
 
         self.action(parsed_args, args)
