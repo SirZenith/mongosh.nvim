@@ -140,12 +140,21 @@ end
 
 -- ----------------------------------------------------------------------------
 
+---@class mongo.ConnectArgs
+---@field host string
+---@field port string
+--
+---@field username string
+---@field password string
+--
+---@field api_version? string
+
 -- connect connects to give host, and get list of available database name from host.
 -- Host will be default to `default_host` provided in configuration.
----@param host string # host address
+---@param args mongo.ConnectArgs
 ---@param callback fun(ok: boolean)
-function M.connect(host, callback)
-    host = host or config.connection.default_host
+function M.connect(args, callback)
+    local host = args.host or config.connection.default_host
 
     M.run_raw_script {
         script = script_const.CMD_LIST_DBS,
