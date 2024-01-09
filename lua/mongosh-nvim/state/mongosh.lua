@@ -13,6 +13,9 @@ local db_names = nil ---@type string[]?
 -- name of selected database
 local cur_db = nil ---@type string?
 
+-- database URI
+local cur_db_addr = nil ---@type string?
+
 -- name list of all available collections
 local collection_names = {} ---@type string[]?
 -- name of selected collections
@@ -96,6 +99,33 @@ end
 ---@return string? db_name
 function M.get_cur_db()
     return cur_db
+end
+
+-- set_cur_db_addr set c
+---@return string? db_addr
+function M.set_cur_db_addr(value)
+    if not value or value:len() == 0 then
+        cur_db_addr = nil
+    else
+        cur_db_addr = str_util.scramble(value)
+    end
+end
+
+-- get_db_addr returns address of current selected database, if no database is
+-- selected `nil` will be returned.
+---@return string? db_addr
+function M.get_cur_db_addr()
+    if cur_db_addr and cur_db_addr:len() > 0 then
+        return str_util.unscramble(cur_db_addr)
+    end
+
+    local host = M.get_cur_host()
+    if not host then return nil end
+
+    local db = M.get_cur_db()
+    if not db then return nil end
+
+    return host .. "/" .. db
 end
 
 -- set_collection_names update cached collection name list.
@@ -199,18 +229,5 @@ function M.get_password()
 end
 
 -- ----------------------------------------------------------------------------
-
--- get_db_addr returns address of current selected database, if no database is
--- selected `nil` will be returned.
----@return string? db_addr
-function M.get_cur_db_addr()
-    local host = M.get_cur_host()
-    if not host then return nil end
-
-    local db = M.get_cur_db()
-    if not db then return nil end
-
-    return host .. "/" .. db
-end
 
 return M

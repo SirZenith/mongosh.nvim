@@ -13,12 +13,12 @@ local M = {}
 -- not `nil`.
 ---@param buffer string[]
 ---@param flag string
----@param value string?
+---@param value any
 local function try_append_flag(buffer, flag, value)
     if value == nil then return end
 
     buffer[#buffer + 1] = flag
-    buffer[#buffer + 1] = value
+    buffer[#buffer + 1] = tostring(value)
 end
 
 -- ----------------------------------------------------------------------------
@@ -52,6 +52,8 @@ function M.get_connection_args()
         args[#args + 1] = value
     end
 
+    try_append_flag(args, "--host", mongosh_state.get_cur_host())
+    try_append_flag(args, "--port", mongosh_state.get_cur_port())
     try_append_flag(args, "--username", mongosh_state.get_username())
     try_append_flag(args, "--password", mongosh_state.get_password())
 

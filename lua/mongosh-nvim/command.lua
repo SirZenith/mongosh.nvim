@@ -13,10 +13,12 @@ cmd_util.register_cmd {
     name = "MongoConnect",
     no_unused_warning = true,
     arg_list = {
+        { name = "db-addr",                       is_flag = true },
+        { name = "with-auth",                     is_flag = true, type = "boolean" },
+
         { name = "host",                          is_flag = true },
         { name = "port",                          is_flag = true, type = "number" },
         { name = "db",                            is_flag = true },
-        { name = "with-auth",                     is_flag = true, type = "boolean" },
 
         -- Authentication
         { name = "authenticationDatabase",        is_flag = true, is_dummy = true },
