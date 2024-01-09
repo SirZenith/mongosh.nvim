@@ -300,7 +300,6 @@ local result_generator_map = {
     [BufferType.QueryResult] = function(mbuf, args, callback)
         local collection = args.collection
             or mbuf.state_args.collection
-            or mongosh_state.get_cur_collection()
         if collection == nil then
             log.warn("collection required")
             callback {}

@@ -72,7 +72,7 @@ end
 
 ---@class mongo.RunScriptArgs
 ---@field script string # script snippet string.
----@field host? string # host address or database address to connect to.
+---@field db_address? string # database address for connection.
 ---@field callback fun(result: mongo.RunCmdResult) # callback for handling evaluation result.
 
 -- call_mongosh calls mongosh executable with given arguments.
@@ -129,20 +129,16 @@ end
 -- long, this function might fail due to OS limitation.
 ---@param args mongo.RunScriptArgs
 function M.run_raw_script(args)
-    local address = args.host or mongosh_state.get_cur_db_addr()
-    if not address then
-        vim.notify("no database is selected", vim.log.levels.WARN)
-        return
-    end
-
+    local address = args.db_address or mongosh_state.get_cur_db_addr()
     local exe_args = M.get_connection_args();
+
     M.call_mongosh {
         args = vim.list_extend(exe_args, {
-            "--quiet",
-            "--eval",
-            args.script,
-            address,
-        }),
+        "--quiet",
+        "--eval",
+        args.script,
+        address or "",
+    }),
         callback = args.callback,
     }
 end
@@ -153,11 +149,7 @@ end
 -- this is for avoiding limitation of maximum command line argument length.
 ---@param args mongo.RunScriptArgs
 function M.run_script(args)
-    local address = args.host or mongosh_state.get_cur_db_addr()
-    if not address then
-        vim.notify("please connect to a database first", vim.log.levels.WARN)
-        return
-    end
+    local address = args.db_address or mongosh_state.get_cur_db_addr()
 
     M.save_tmp_script_file(args.script, function(tmpfile_name)
         local exe_args = M.get_connection_args()
@@ -165,7 +157,7 @@ function M.run_script(args)
         M.call_mongosh {
             args = vim.list_extend(exe_args, {
                 "--quiet",
-                address,
+                address or "",
                 tmpfile_name
             }),
             callback = args.callback,
@@ -215,23 +207,24 @@ function M.clear_connection_flags()
 end
 
 ---@class mongo.ConnectArgs
----@field host string
+---@field db_addr string
+---@field host? string
 ---@field port? number
 --
 ---@field username? string
 ---@field password? string
 
 -- connect connects to give host, and get list of available database name from host.
--- Host will be default to `default_host` provided in configuration.
 ---@param args mongo.ConnectArgs
 ---@param callback fun(err?: string)
 function M.connect(args, callback)
-    local host = args.host
-    if not host then
-        callback("no host address given")
+    local db_addr = args.db_addr
+    if not db_addr then
+        callback("no database address given")
         return
     end
 
+    mongosh_state.set_cur_host(args.host)
     mongosh_state.set_cur_port(args.port)
     mongosh_state.set_username(args.username)
     mongosh_state.set_password(args.password)

@@ -20,6 +20,10 @@ M = {
         ---@type string
         default_host = "localhost:27017",
 
+        -- default database address
+        ---@type string
+        default_db_addr = "localhost:27017",
+
         -- names in this list won't be listed in available database list.
         ---@type string[]
         ignore_db_names = {

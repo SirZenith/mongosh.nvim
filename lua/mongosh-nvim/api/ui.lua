@@ -87,31 +87,6 @@ function M.select_database_ui()
     )
 end
 
--- select_collection selects a collection among available ones.
----@param collection_name string
-function M.select_collection(collection_name)
-    local full_list = mongosh_state.get_collection_names()
-    if #full_list == 0 then
-        log.info("no available collection found")
-        return
-    end
-
-    local is_found = false
-    for _, name in ipairs(full_list) do
-        if name == collection_name then
-            is_found = true
-            break
-        end
-    end
-
-    if not is_found then
-        log.warn("collection is not available: " .. collection_name)
-        return
-    end
-
-    mongosh_state.set_cur_collection(collection_name)
-end
-
 -- select_collection_ui_buffer creates a buffer for collection selection.
 function M.select_collection_ui_buffer()
     local db_addr = mongosh_state.get_cur_db_addr()

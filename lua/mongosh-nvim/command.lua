@@ -18,7 +18,6 @@ cmd_util.register_cmd {
 
         { name = "host",                          is_flag = true },
         { name = "port",                          is_flag = true, type = "number" },
-        { name = "db",                            is_flag = true },
 
         -- Authentication
         { name = "authenticationDatabase",        is_flag = true, is_dummy = true },
@@ -79,8 +78,12 @@ cmd_util.register_cmd {
         -- try connecting
         ---@type mongo.ConnectArgs
         local connect_args = {
-            host = args.host or config.connection.default_host,
+            db_addr = args.db_addr,
+            host = args.host,
             port = args.port,
+
+            username = "",
+            password = "",
         }
 
         util.do_async_steps {
