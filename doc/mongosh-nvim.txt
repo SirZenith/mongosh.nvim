@@ -26,7 +26,7 @@ term connection is kept.
 This plugin manage its operations by attaching meta info to buffers.
 
 For example, by recognizing operation type of a buffer, one command can behave
-differently on different buffer, see |:MongoEdit|.
+differently on different buffer, see |mongosh-nvim.cmd.edit|.
 
 If a buffer is created by this plugin, such meta info will be attached as the
 buffer is created. For an existing buffer, once your run command with its
@@ -45,7 +45,10 @@ if you like to.
 ===============================================================================
 3. Commands                                              *mongosh-nvim-command*
 
-*:MongoConnect*
+This plugin provides one user command `:Mongo` as entrance, each of its
+subcommand provides one actual functionality.
+
+`:Mongo connect`                                     *mongosh-nvim.cmd.connect*
 
     This command sets connection arguments for latter executation.
 
@@ -83,18 +86,18 @@ if you like to.
     This makes connection information not directly readable when your memory
     gets dumped.
 
-*:MongoDatabase*
+`:Mongo database`                                   *mongosh-nvim.cmd.database*
 
     List all available databases on current host and pick one as current target.
 
-*:MongoCollection*
+`:Mongo collection`                               *mongosh-nvim.cmd.collection*
 
     List all available collections in a buffer and pick one to create a new query
     buffer.
     Selection is made putting cursor on target collection name and press `Enter`
     key.
 
-*:MongoExecute*
+`:Mongo execute`                                     *mongosh-nvim.cmd.execute*
 
     Run content in current buffer with mongosh. Command support range argument.
     With visual selection, only selected part will be executed.
@@ -105,12 +108,7 @@ if you like to.
     your script snippet yourself, or else there will only be default content
     in result buffer.
 
-*:MongoNewQuery*
-
-    List all available collections in current database. Create a new query
-    buffer with user selection.
-
-*:MongoQuery*
+`:Mongo query`                                         *mongosh-nvim.cmd.query*
 
     Run query in current buffer. Command support range argument.
     With visual selection, only selected part will be executed.
@@ -126,15 +124,7 @@ if you like to.
     value returned by query expression will be written to result buffer as
     JSON.
 
-*:MongoNewEdit*
-
-    Create a new edit buffer with given collection name, document id.
-
-    Available flags:
-        - `collection`, `c`, target collection name.
-        - `id`, document's `_id` field value.
-
-*:MongoEdit*
+`:Mongo edit`                                           *mongosh-nvim.cmd.edit*
 
     Run edit snippet in current buffer. Command support range argument.
     With visual selection, only selected part will be executed.
@@ -157,12 +147,25 @@ if you like to.
     Executation result of a replace snippet will be written to result buffer
     as JSON text.
 
-*:MongoRefresh*
+`:Mongo refresh`                                     *mongosh-nvim.cmd.refresh*
 
     Regenerates content of current buffer according to its type.
 
     For example, running this command in a query result buffer will run its
     query again, and query result will again be written to that buffer.
+
+`:Mongo new query`                                 *mongosh-nvim.cmd.new.query*
+
+    List all available collections in current database. Create a new query
+    buffer with user selection.
+
+`:Mongo new edit`                                   *mongosh-nvim.cmd.new.edit*
+
+    Create a new edit buffer with given collection name, document id.
+
+    Available flags:
+        - `collection`, `c`, target collection name.
+        - `id`, document's `_id` field value.
 
 ===============================================================================
 4. Configuration                                   *mongosh-nvim-configuration*
