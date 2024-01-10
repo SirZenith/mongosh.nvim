@@ -45,7 +45,7 @@ function M.select_database(db_name)
         return
     end
 
-    mongosh_state.set_cur_db(db_name)
+    mongosh_state.set_db(db_name)
 end
 
 -- select_database_ui lets user pick a database from name list.
@@ -77,7 +77,7 @@ function M.select_database_ui()
         db_names,
         { prompt = "Select a database:" },
         function(db)
-            mongosh_state.set_cur_db(db)
+            mongosh_state.set_db(db)
             api_core.update_collection_list(function(err)
                 if err then
                     log.warn(err)
@@ -87,10 +87,28 @@ function M.select_database_ui()
     )
 end
 
+-- try_select_database_ui shows database selection UI if no valid database is
+-- selected right now.
+function M.try_select_database_ui()
+    local db = mongosh_state.get_db()
+
+    local full_list = mongosh_state.get_db_names()
+    local is_found = false
+    for _, name in ipairs(full_list) do
+        if name == db then
+            is_found = true
+            break
+        end
+    end
+
+    if not is_found then
+        M.select_database_ui()
+    end
+end
+
 -- select_collection_ui_buffer creates a buffer for collection selection.
 function M.select_collection_ui_buffer()
-    local db_addr = mongosh_state.get_cur_db_addr()
-    if not db_addr then
+    if not mongosh_state.get_db() then
         log.warn("please connect to a database first")
         return
     end
@@ -101,8 +119,7 @@ end
 
 -- select_collection_ui_list asks user to select a collection name from list.
 function M.select_collection_ui_list()
-    local db_addr = mongosh_state.get_cur_db_addr()
-    if not db_addr then
+    if not mongosh_state.get_db() then
         log.warn("please connect to a database first")
         return
     end

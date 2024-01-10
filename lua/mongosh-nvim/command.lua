@@ -16,8 +16,9 @@ cmd_util.register_cmd {
         { name = "db-addr",                       is_flag = true },
         { name = "with-auth",                     is_flag = true, type = "boolean" },
 
-        { name = "host",                          is_flag = true },
-        { name = "port",                          is_flag = true, type = "number" },
+        -- Basic
+        { name = "host",                          is_flag = true, is_dummy = true },
+        { name = "port",                          is_flag = true, is_dummy = true },
 
         -- Authentication
         { name = "authenticationDatabase",        is_flag = true, is_dummy = true },
@@ -121,12 +122,7 @@ cmd_util.register_cmd {
                         return
                     end
 
-                    local db = args.db
-                    if db then
-                        api_ui.select_database(db)
-                    else
-                        api_ui.select_database_ui()
-                    end
+                    api_ui.try_select_database_ui()
 
                     next_step()
                 end)

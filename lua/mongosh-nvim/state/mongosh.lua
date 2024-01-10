@@ -1,4 +1,7 @@
 local str_util = require "mongosh-nvim.util.str"
+local db_addr_util = require "mongosh-nvim.util.db_address"
+
+local DbAddressData = db_addr_util.DbAddressData
 
 local M = {}
 
@@ -7,35 +10,15 @@ local M = {}
 -- raw flag-value pairs that gets directly prepended to command line arguments.
 local raw_flag_map = {} ---@type table<string, string>
 
----@class mongo.DbUriData
----@field protocol? string
----@field host? string
----@field port? number
----@field db? string
----@field param? string
-
-local db_address = {
-    protocol = nil,
-    host = nil,
-    port = nil,
-    db = nil,
-    param = nil,
-}
-
 local username = nil ---@type string?
 local password = nil ---@type string?
+
+local addr_data = DbAddressData:new()
 
 -- name list of all available databases
 local db_names = nil ---@type string[]?
 -- name list of all available collections
 local collection_names = {} ---@type string[]?
-
--- parse_db_addr parses address connection URI.
----@param addr string
----@return mongo.DbUriData
-local function parse_db_addr(addr)
-    return {}
-end
 
 -- ----------------------------------------------------------------------------
 -- Raw Flags
@@ -67,106 +50,53 @@ end
 -- ----------------------------------------------------------------------------
 -- Connection state
 
--- set_host update cached last connected host address
+-- set_db_addr sets database address for current connection.
+---@return string? db_addr
+function M.set_db_addr(value)
+    addr_data:parse_addr(value or "")
+end
+
+---@return string db_addr # database address of current connection.
+function M.get_db_addr()
+    return addr_data:to_db_addr()
+end
+
+-- set_host set host value for current connection.
 ---@param value string
-function M.set_cur_host(value)
-    db_address.host = str_util.scramble(value or "")
-    M.reset_db_cache()
+function M.set_host(value)
+    addr_data:set_host(value)
 end
 
--- get_host returns last host address this plugin has connected to.
--- If no host is ever connected to, `nil` will be returned.
----@return string? host_addr
-function M.get_cur_host()
-    local cur_host = db_address.host
-    if not cur_host or cur_host:len() == 0 then return nil end
-    return str_util.unscramble(cur_host)
+---@return string? host_addr # host value of current connection.
+function M.get_host()
+    return addr_data:get_host()
 end
 
--- set_cur_port sets port number for current connection.
+-- set_port sets port number for current connection.
 ---@param value? number
-function M.set_cur_port(value)
-    db_address.cur_port = value or 0
-    M.reset_db_cache()
+function M.set_port(value)
+    addr_data:set_port(value)
 end
 
--- get_cur_port returns port of current connection. If no special port is specified
+-- get_port returns port of current connection. If no special port is specified
 -- `nil` will be returned.
 ---@return number? port
-function M.get_cur_port()
-    local cur_port = db_address.port
-    if not cur_port or cur_port <= 0 then return nil end
-    return cur_port
+function M.get_port()
+    return addr_data:get_port()
 end
 
 -- set_cur_db selectes a database in current host.
 -- If `nil` is passed in, database selection is cleared.
 ---@param value string?
-function M.set_cur_db(value)
-    db_address.db = value
-    M.reset_collection_name_cache()
+function M.set_db(value)
+    addr_data:set_db(value)
 end
 
--- get_cur_db returns currently selected database name.
+-- get_db returns currently selected database name.
 -- If no database is selected `nil` will be returned.
 ---@return string? db_name
-function M.get_cur_db()
-    return db_address.db
-end
-
--- set_cur_db_addr set c
----@return string? db_addr
-function M.set_cur_db_addr(value)
-    if not value or value:len() == 0 then
-        db_address = {}
-        return
-    end
-
-    local data = parse_db_addr(value)
-    db_address.protocol = data.protocol
-    db_address.param = data.param
-    M.set_cur_host(data.host)
-    M.set_cur_port(data.port)
-    M.set_cur_db(data.db)
-end
-
--- get_db_addr returns address of current selected database, if no database is
--- selected `nil` will be returned.
----@return string? db_addr
-function M.get_cur_db_addr()
-    local buffer = {}
-
-    local protocol = db_address.protocol
-    if protocol then
-        buffer[#buffer + 1] = protocol
-    end
-
-    local host = M.get_cur_host()
-    if host then
-        buffer[#buffer + 1] = host
-    end
-
-    local port = M.get_cur_port()
-    if port and port > 0 then
-        buffer[#buffer + 1] = ":" .. tostring(port)
-    end
-
-    -- any data in buffer indicates need of separator before database name.
-    if #buffer > 1 then
-        buffer[#buffer + 1] = "/"
-    end
-
-    local db = M.get_cur_db()
-    if db then
-        buffer[#buffer + 1] = db
-    end
-
-    local param = db_address.param
-    if param then
-        buffer[#buffer + 1] = "?" .. param
-    end
-
-    return table.concat(buffer)
+function M.get_db()
+    return addr_data:get_db()
 end
 
 -- ----------------------------------------------------------------------------
