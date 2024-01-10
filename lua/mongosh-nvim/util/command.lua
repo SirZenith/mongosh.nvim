@@ -372,7 +372,7 @@ function Command:_run_as_user_command(args)
     local action = cmd.action
     if type(action) ~= "function" then return end
 
-    local err, parsed_args, unused_args = self:_parse_args(fargs, cur_index)
+    local err, parsed_args, unused_args = cmd:_parse_args(fargs, cur_index)
     if err then
         log.warn(err)
     else
