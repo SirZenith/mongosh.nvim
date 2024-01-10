@@ -198,19 +198,19 @@ cmd_util.new_cmd {
 
 -- ----------------------------------------------------------------------------
 
-local cmd_new = cmd_util.new_cmd {
+local cmd_mongo_new = cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "new"
 }
 
 cmd_util.new_cmd {
-    parent = cmd_new,
+    parent = cmd_mongo_new,
     name = "query",
     action = api_ui.select_collection_ui_list,
 }
 
 cmd_util.new_cmd {
-    parent = cmd_new,
+    parent = cmd_mongo_new,
     name = "edit",
     arg_list = {
         { name = "collection", is_flag = true, short = "c",    required = true },
