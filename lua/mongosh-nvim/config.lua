@@ -16,9 +16,9 @@ M = {
     indent_size = 4,
 
     connection = {
-        -- default host address for connection.
+        -- default database address for connection
         ---@type string
-        default_host = "localhost:27017",
+        default_db_addr = "localhost:27017",
 
         -- names in this list won't be listed in available database list.
         ---@type string[]

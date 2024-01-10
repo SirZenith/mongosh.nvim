@@ -198,6 +198,7 @@ local arg_value_converter_map = {
 ---@field short? string
 ---@field is_flag? boolean # indicating an argument is used as flag
 ---@field is_list? boolean # indicating a positional argument matches multiple value, and implies type `string[]`, can't be used with `is_flag`.
+---@field is_dummy? boolean # indicating an argument does not consume command line text, only serve as completion item.
 ---@field type? mongo.CommandArgType
 ---@field default? any
 ---@field required? boolean
@@ -244,7 +245,9 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
 
     local is_flag = arg_spec.is_flag
     local value
-    if is_flag then
+    if arg_spec.is_dummy then
+        -- ignored
+    elseif is_flag then
         local long = arg_spec.name
         if long then
             value = raw_parsed[long]
@@ -274,7 +277,7 @@ function Command:_extract_arg(raw_parsed, arg_spec, cur_pos_index)
     end
 
     -- check required
-    if arg_spec.required and value == nil then
+    if not arg_spec.is_dummy and arg_spec.required and value == nil then
         if is_flag then
             err = "flag `" .. arg_spec.name .. "` is required"
         else

@@ -111,7 +111,7 @@ local function get_char_map_pair()
 end
 
 -- scramble mapped plain text by shuffeled ASCII list, so that its not directly
--- readable when memory gets dumpped.
+-- readable when memory gets dumped.
 ---@param s string
 ---@return string
 function M.scramble(s)

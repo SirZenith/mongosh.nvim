@@ -7,14 +7,51 @@ local api_core = require "mongosh-nvim.api.core"
 local api_ui = require "mongosh-nvim.api.ui"
 
 -- ----------------------------------------------------------------------------
+-- Connecting
 
 cmd_util.register_cmd {
     name = "MongoConnect",
     no_unused_warning = true,
     arg_list = {
-        { name = "host",           is_flag = true },
-        { name = "db",             is_flag = true },
-        { name = "with-auth",      is_flag = true, type = "boolean" },
+        { name = "db-addr",                       is_flag = true },
+        { name = "with-auth",                     is_flag = true, type = "boolean" },
+
+        -- Basic
+        { name = "host",                          is_flag = true, is_dummy = true },
+        { name = "port",                          is_flag = true, is_dummy = true },
+
+        -- Authentication
+        { name = "authenticationDatabase",        is_flag = true, is_dummy = true },
+        { name = "authenticationMechanism",       is_flag = true, is_dummy = true },
+        { name = "awsIamSessionToken",            is_flag = true, is_dummy = true },
+        { name = "gssapiServiceName",             is_flag = true, is_dummy = true },
+        { name = "sspiHostnameCanonicalization",  is_flag = true, is_dummy = true },
+        { name = "sspiRealmOverride",             is_flag = true, is_dummy = true },
+
+        -- TLS
+        { name = "tls",                           is_flag = true, is_dummy = true },
+        { name = "tlsCertificateKeyFile",         is_flag = true, is_dummy = true },
+        { name = "tlsCertificateKeyFilePassword", is_flag = true, is_dummy = true },
+        { name = "tlsCAFile",                     is_flag = true, is_dummy = true },
+        { name = "tlsAllowInvalidHostnames",      is_flag = true, is_dummy = true },
+        { name = "tlsAllowInvalidCertificates",   is_flag = true, is_dummy = true },
+        { name = "tlsCertificateSelector",        is_flag = true, is_dummy = true },
+        { name = "tlsCRLFile",                    is_flag = true, is_dummy = true },
+        { name = "tlsDisabledProtocols",          is_flag = true, is_dummy = true },
+        { name = "tlsUseSystemCA",                is_flag = true, is_dummy = true },
+        { name = "tlsFIPSMode",                   is_flag = true, is_dummy = true },
+
+        -- API version
+        { name = "apiVersion",                    is_flag = true, is_dummy = true },
+        { name = "apiStrict",                     is_flag = true, is_dummy = true },
+        { name = "apiDeprecationErrors",          is_flag = true, is_dummy = true },
+
+        -- FLE
+        { name = "awsAccessKeyId",                is_flag = true, is_dummy = true },
+        { name = "awsSecretAccessKey",            is_flag = true, is_dummy = true },
+        { name = "awsSessionToken",               is_flag = true, is_dummy = true },
+        { name = "keyVaultNamespace",             is_flag = true, is_dummy = true },
+        { name = "kmsURL",                        is_flag = true, is_dummy = true },
     },
     action = function(args, _, unused_args)
         -- update raw connection flags
@@ -42,7 +79,10 @@ cmd_util.register_cmd {
         -- try connecting
         ---@type mongo.ConnectArgs
         local connect_args = {
-            host = args.host or config.connection.default_host,
+            db_addr = args.db_addr,
+
+            username = "",
+            password = "",
         }
 
         util.do_async_steps {
@@ -80,12 +120,7 @@ cmd_util.register_cmd {
                         return
                     end
 
-                    local db = args.db
-                    if db then
-                        api_ui.select_database(db)
-                    else
-                        api_ui.select_database_ui()
-                    end
+                    api_ui.try_select_database_ui()
 
                     next_step()
                 end)
@@ -93,6 +128,8 @@ cmd_util.register_cmd {
         }
     end,
 }
+
+-- ----------------------------------------------------------------------------
 
 cmd_util.register_cmd {
     name = "MongoDatabase",

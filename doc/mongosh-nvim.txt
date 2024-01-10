@@ -47,20 +47,49 @@ if you like to.
 
 *:MongoConnect*
 
-    Sets current target host address. If no host is provided via flag argument,
-    plugin will use the default host in config.
+    This command sets connection arguments for latter executation.
 
-    Available flags:
-        - `host`, address of host machine.
-        - `db`, target database name.
+    This command is almost transparent to mongosh, which means most flags you
+    provide to this command will be passed to mongosh as is. And all flags
+    supported by mongosh can be passed to this command. (Note: though not all
+    mongosh flags are listed in completion of this command, they are still
+    supported and will finally be passed to mongosh calls.)
+
+    There are several extra flags provided by this command:
+        - `db-addr`, database address used for connection, value takes one of
+        following forms:
+            - database name: `foo`
+            - host address and database name: `localhost/foo`
+            - host address with port and database name: `localhost:27017/foo`
+            - any valid connection URI string: `mongosh://localhost:27017/foo`
+
+          Value of this flag will be used as first positional argument to mongosh
+        calls. Everything mongosh supports for this argument also works here.
+
+        - `with-auth`, a boolean flag, presence of this flag indicates `true`.
+        When sets to `true`, plugin will ask user input for authentication
+        user name and password.
+
+          You can also provides user name and password via `--username` and
+        `--password` flag if you don't mind your password gets recorded in input
+        history.
+
+    Normally speaking, everyone who can reads memory of running program on
+    your machine can do many other horrible things to your system, so this
+    plugin assumes storing connection informations in memory to be safe.
+
+    With that being said, this plugin still remaps string connection info with a
+    shuffeled ASCII list, texts gets recovered only when they are read, used.
+    This makes connection information not directly readable when your memory
+    gets dumped.
 
 *:MongoDatabase*
 
-    List all available databases on current host, pick one as current target.
+    List all available databases on current host and pick one as current target.
 
 *:MongoCollection*
 
-    List all available collections in a buffer, pick one to create a new query
+    List all available collections in a buffer and pick one to create a new query
     buffer.
     Selection is made putting cursor on target collection name and press `Enter`
     key.
@@ -102,7 +131,7 @@ if you like to.
     Create a new edit buffer with given collection name, document id.
 
     Available flags:
-        - `collection`, `coll`, target collection name.
+        - `collection`, `c`, target collection name.
         - `id`, document's `_id` field value.
 
 *:MongoEdit*
@@ -141,11 +170,15 @@ if you like to.
 All available config options and default config value are list at
 https://github.com/SirZenith/mongosh.nvim/blob/main/lua/mongosh-nvim/config.lua
 
-User config table should be passed to plugin by
+User config table can be passed to plugin as follow:
 
 >lua
     require "mongosh-nvim".setup {
         -- your config here
+        executable = "/usr/local/bin/mongosh"
+        connection = {
+            default_db_addr = "192.168.1.10:10001"
+        }
     }
 <
 
