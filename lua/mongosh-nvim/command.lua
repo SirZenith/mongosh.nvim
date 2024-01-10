@@ -177,11 +177,11 @@ cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "edit",
     range = true,
-    action = function(args)
+    action = function(_, orig_args)
         api_ui.run_buffer_edit(
             vim.api.nvim_win_get_buf(0),
             {
-                with_range = args.range ~= 0,
+                with_range = orig_args.range ~= 0,
             }
         )
     end,
