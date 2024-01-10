@@ -17,8 +17,8 @@ local addr_data = DbAddressData:new()
 
 -- name list of all available databases
 local db_names = nil ---@type string[]?
--- name list of all available collections
-local collection_names = {} ---@type string[]?
+-- map database name to collection name list of all available collections
+local collection_name_cache = {} ---@type table<string, string[]>
 
 -- ----------------------------------------------------------------------------
 -- Raw Flags
@@ -169,20 +169,32 @@ end
 
 -- set_collection_names update cached collection name list.
 ---@param names string[]
-function M.set_collection_names(names)
-    collection_names = {}
+---@param db? string # database name, default value is database name of current connection.
+function M.set_collection_names(names, db)
+    db = db or M.get_db()
+    if not db then return end
+
+    local collections = {}
     for _, name in ipairs(names) do
-        collection_names[#collection_names + 1] = name
+        collections[#collections + 1] = name
     end
+
+    collection_name_cache[db] = collections
 end
 
 -- get_collection_names returns all available collection names in current database.
+---@param db? string # database name, default value is database name of current connection.
 ---@return string[] collection_names
-function M.get_collection_names()
+function M.get_collection_names(db)
     local results = {}
-    if not collection_names then return results end
 
-    for _, name in ipairs(collection_names) do
+    db = db or M.get_db()
+    if db then return results end
+
+    local names = collection_name_cache[db]
+    if not names then return results end
+
+    for _, name in ipairs(names) do
         results[#results + 1] = name
     end
 
@@ -190,14 +202,15 @@ function M.get_collection_names()
 end
 
 -- reset_collection_name_cache clears collection name list cache for current database.
-function M.reset_collection_name_cache()
-    collection_names = nil
+---@param db string # database name
+function M.reset_collection_name_cache(db)
+    collection_name_cache[db] = nil
 end
 
 -- reset_db_cache clears cached data for connection.
 function M.reset_db_cache()
     M.reset_db_name_cache()
-    M.reset_collection_name_cache()
+    collection_name_cache = {}
 end
 
 return M

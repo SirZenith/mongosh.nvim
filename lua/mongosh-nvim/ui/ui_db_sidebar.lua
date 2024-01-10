@@ -1,3 +1,4 @@
+local api_core = require "mongosh-nvim.api.core"
 local config = require "mongosh-nvim.config"
 local log = require "mongosh-nvim.log"
 
@@ -105,18 +106,47 @@ end
 
 ---@class mongo.ui.UIDBSidebar
 ---@field bufnr? integer
+---@field preview_winnr integer
 ---@field databases mongo.ui.DBSideItem[]
 local UIDBSidebar = {}
 UIDBSidebar.__index = UIDBSidebar
 
 ---@return mongo.ui.UIDBSidebar
-function UIDBSidebar:new()
+function UIDBSidebar:new(preview_winnr)
     local obj = setmetatable({}, self)
 
     obj.bufnr = nil
+    obj.preview_winnr = preview_winnr
     obj.databases = {}
 
+    obj:register_event()
+
     return obj
+end
+
+function UIDBSidebar:register_event()
+    local core_emitter = api_core.emitter
+    local core_event = api_core.EventType
+
+    core_emitter:on(core_event.collection_list_update, self, self.on_collectioni_list_update)
+
+    api.nvim_create_autocmd(
+        { "BufUnload" },
+        {
+            buffer = self.bufnr,
+            callback = function()
+                if api.nvim_get_current_buf() ~= self.bufnr then
+                    return
+                end
+
+                self:destory()
+            end
+        }
+    )
+end
+
+function UIDBSidebar:destory()
+    api_core.emitter:off_all(self)
 end
 
 -- update_databases sets database name list with given name array.
@@ -160,6 +190,10 @@ function UIDBSidebar:show()
 
     api.nvim_win_set_buf(winnr, bufnr)
 
+    self:write_to_buffer()
+end
+
+function UIDBSidebar:on_collectioni_list_update()
     self:write_to_buffer()
 end
 

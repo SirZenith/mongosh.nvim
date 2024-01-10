@@ -128,8 +128,10 @@ function M.select_collection_ui_list()
     )
 end
 
+-- show_db_side_bar opens database side bar.
 function M.show_db_side_bar()
-    local panel = ui_db_sidebar.UIDBSidebar:new()
+    local winnr = vim.api.nvim_get_current_win()
+    local panel = ui_db_sidebar.UIDBSidebar:new(winnr)
 
     local db_names = api_core.get_filtered_db_list()
     panel:update_databases(db_names)

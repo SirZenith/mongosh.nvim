@@ -4,10 +4,17 @@ local log = require "mongosh-nvim.log"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
 local util = require "mongosh-nvim.util"
 local str_util = require "mongosh-nvim.util.str"
+local event_util = require "mongosh-nvim.util.event"
 
 local loop = vim.loop
 
 local M = {}
+
+M.EventType = {
+    collection_list_update = "collection_list_update",
+}
+
+M.emitter = event_util.EventEmitter:new("api.core", M.EventType)
 
 -- try_append_flag appends flag-value pair to argument buffer list if value is
 -- not `nil`.
@@ -239,7 +246,12 @@ end
 
 -- get_collections get name list of all available collections in current data base
 ---@param callback fun(err?: string)
-function M.update_collection_list(callback)
+---@param db? string
+function M.update_collection_list(callback, db)
+    if db then
+        mongosh_state.set_db(db)
+    end
+
     M.run_raw_script {
         script = script_const.CMD_LIST_COLLECTIONS,
         callback = function(result)
@@ -250,7 +262,10 @@ function M.update_collection_list(callback)
 
             local collections = vim.fn.json_decode(result.stdout)
             table.sort(collections)
+
             mongosh_state.set_collection_names(collections)
+
+            M.emitter:emit(M.EventType.collection_list_update)
 
             callback()
         end,
