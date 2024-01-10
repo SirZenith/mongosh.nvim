@@ -80,8 +80,6 @@ cmd_util.register_cmd {
         ---@type mongo.ConnectArgs
         local connect_args = {
             db_addr = args.db_addr,
-            host = args.host,
-            port = args.port,
 
             username = "",
             password = "",

@@ -16,11 +16,7 @@ M = {
     indent_size = 4,
 
     connection = {
-        -- default host address for connection.
-        ---@type string
-        default_host = "localhost:27017",
-
-        -- default database address
+        -- default database address for connection
         ---@type string
         default_db_addr = "localhost:27017",
 

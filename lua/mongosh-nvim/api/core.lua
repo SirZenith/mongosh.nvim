@@ -132,11 +132,11 @@ function M.run_raw_script(args)
 
     M.call_mongosh {
         args = vim.list_extend(exe_args, {
-        "--quiet",
-        "--eval",
-        args.script,
-        address,
-    }),
+            "--quiet",
+            "--eval",
+            args.script,
+            address,
+        }),
         callback = args.callback,
     }
 end
@@ -205,7 +205,7 @@ function M.clear_connection_flags()
 end
 
 ---@class mongo.ConnectArgs
----@field db_addr string
+---@field db_addr? string
 --
 ---@field username? string
 ---@field password? string
@@ -214,7 +214,9 @@ end
 ---@param args mongo.ConnectArgs
 ---@param callback fun(err?: string)
 function M.connect(args, callback)
-    mongosh_state.set_db_addr(args.db_addr)
+    local db_addr = args.db_addr or config.connection.default_db_addr
+    mongosh_state.set_db_addr(db_addr)
+
     mongosh_state.set_username(args.username)
     mongosh_state.set_password(args.password)
 
