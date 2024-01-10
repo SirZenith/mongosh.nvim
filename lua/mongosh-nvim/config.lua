@@ -74,6 +74,29 @@ M = {
         ---@type mongo.CreateBufferStyle
         create_buffer_style = CreateBufferStyle.OnNeed,
     },
+
+    sidebar = {
+        -- column width of sidebar
+        ---@type integer
+        width = 30,
+
+        -- left padding size for nested content.
+        ---@type integer
+        padding = 4,
+
+        symbol = {
+            expanded = {
+                indicator = " ",
+                database = " ",
+                collection = "󱔘 ",
+            },
+            collapsed = {
+                indicator = " ",
+                database = " ",
+                collection = "󱔗 ",
+            },
+        },
+    },
 }
 
 return M

@@ -303,4 +303,30 @@ function M.do_replace(edit_snippet, callback, fallback_err_msg)
     M.do_execution(script_snippet, callback, fallback_err_msg or "replace failed")
 end
 
+-- ----------------------------------------------------------------------------
+
+-- get_filtered_db_list returns names of available databases except ignored
+-- databases listed in config.
+---@return string[] db_names
+function M.get_filtered_db_list()
+    local full_list = mongosh_state.get_db_names()
+    if #full_list == 0 then
+        return {}
+    end
+
+    local ignore_set = {}
+    for _, name in ipairs(config.connection.ignore_db_names) do
+        ignore_set[name] = true
+    end
+
+    local db_names = {}
+    for _, name in ipairs(full_list) do
+        if not ignore_set[name] then
+            db_names[#db_names + 1] = name
+        end
+    end
+
+    return db_names
+end
+
 return M

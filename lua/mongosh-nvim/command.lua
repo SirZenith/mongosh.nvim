@@ -226,4 +226,12 @@ cmd_util.new_cmd {
 
 -- ----------------------------------------------------------------------------
 
+cmd_util.new_cmd {
+    parent = cmd_mongo,
+    name = "sidebar",
+    action = api_ui.show_db_side_bar,
+}
+
+-- ----------------------------------------------------------------------------
+
 cmd_mongo:register()

@@ -5,6 +5,8 @@ local api_core = require "mongosh-nvim.api.core"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
 local buffer_state = require "mongosh-nvim.state.buffer"
 
+local ui_db_sidebar = require "mongosh-nvim.ui.ui_db_sidebar"
+
 local BufferType = buffer_const.BufferType
 
 local M = {}
@@ -50,23 +52,7 @@ end
 
 -- select_database_ui lets user pick a database from name list.
 function M.select_database_ui()
-    local full_list = mongosh_state.get_db_names()
-    if #full_list == 0 then
-        log.info("no available database found")
-        return
-    end
-
-    local ignore_set = {}
-    for _, name in ipairs(config.connection.ignore_db_names) do
-        ignore_set[name] = true
-    end
-
-    local db_names = {}
-    for _, name in ipairs(full_list) do
-        if not ignore_set[name] then
-            db_names[#db_names + 1] = name
-        end
-    end
+    local db_names = api_core.get_filtered_db_list()
 
     if #db_names == 0 then
         log.info("only ignored databases are found")
@@ -140,6 +126,15 @@ function M.select_collection_ui_list()
             M.create_query_buffer(collection)
         end
     )
+end
+
+function M.show_db_side_bar()
+    local panel = ui_db_sidebar.UIDBSidebar:new()
+
+    local db_names = api_core.get_filtered_db_list()
+    panel:update_databases(db_names)
+
+    panel:show()
 end
 
 -- ----------------------------------------------------------------------------
