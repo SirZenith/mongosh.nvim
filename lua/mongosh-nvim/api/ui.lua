@@ -103,6 +103,12 @@ function M.try_select_database_ui()
 
     if not is_found then
         M.select_database_ui()
+    else
+        api_core.update_collection_list(function(err)
+            if err then
+                log.warn(err)
+            end
+        end)
     end
 end
 
