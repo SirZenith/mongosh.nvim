@@ -27,19 +27,24 @@ local collection_names = {} ---@type string[]?
 ---@param flag string # flag key, e.g. --foo, -b
 ---@param value string?
 function M.set_raw_flag(flag, value)
-    raw_flag_map[flag] = value
+    raw_flag_map[flag] = value and str_util.scramble(value) or nil
 end
 
 -- get_raw_flag returns stored value of a given flag.
 ---@return string? value
 function M.get_raw_flag(flag)
-    return raw_flag_map[flag]
+    local value = raw_flag_map[flag]
+    return value and str_util.unscramble(value)
 end
 
 -- get_raw_flag returns a copy of raw flag table.
 ---@return table<string, string>
 function M.get_raw_flag_map()
-    return vim.deepcopy(raw_flag_map)
+    local copy = {}
+    for flag in pairs(raw_flag_map) do
+        copy[flag] = M.get_raw_flag(flag)
+    end
+    return copy
 end
 
 -- clear_all_raw_flags deletes all connection raw flag value.
