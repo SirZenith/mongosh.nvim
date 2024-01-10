@@ -11,7 +11,8 @@ mongosh and inspect executation result in NeoVim.
 
 You can:
 
-- List available databases and collections on a host.
+- Connect to database with authentication.
+- List available databases and collections for current connection.
 - Execute script in buffer.
 - Make query by buffer content.
 - Edit document by buffer content.
@@ -33,9 +34,15 @@ Then, install this plugin with plugin manager of your choice.
 
 ## Configuration
 
+User config table can be passed to plugin as follow:
+
 ```lua
 require "mongosh-nvim".setup {
     -- your config here
+    executable = "/usr/local/bin/mongosh"
+    connection = {
+        default_db_addr = "192.168.1.10:10001"
+    }
 }
 ```
 
