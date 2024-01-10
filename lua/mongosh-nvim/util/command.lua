@@ -219,6 +219,7 @@ local arg_value_converter_map = {
 --
 ---@field action mongo.CommandActionCallback
 ---@field arg_list mongo.CommandArg[]
+---@field _subcommands table<string, mongo.Command>
 local Command = {}
 Command.__index = Command
 
@@ -235,7 +236,31 @@ function Command:new(args)
     local arg_list = args.arg_list
     obj.arg_list = arg_list and vim.deepcopy(args.arg_list) or {}
 
+    obj._subcommands = {}
+
     return obj
+end
+
+-- add_sub_cmd adds all commands in list as subcommand.
+---@param commands mongo.Command[]
+function Command:add_sub_cmd(commands)
+    for _, cmd in ipairs(commands) do
+        local name = cmd.name
+
+        local old_cmd = self:_get_sub_cmd(name)
+        if old_cmd then
+            log.warn("duplicated command name: " .. name)
+        else
+            self._subcommands[name] = cmd
+        end
+    end
+end
+
+-- _get_sub_cmd searchs subcommand with given name.
+---@param name string
+---@return mongo.Command?
+function Command:_get_sub_cmd(name)
+    return self._subcommands[name]
 end
 
 -- _extract_arg takes value out of parsed argument table.
@@ -383,30 +408,43 @@ function Command:_make_completor()
     return flag_completor_maker(self.arg_list)
 end
 
-function Command:register()
-    if self.name:len() == 0 then return end
-
+-- _get_cmd_narg returns command-nargs value of current command.
+---@return string | number
+function Command:_get_cmd_nargs()
     local flag_cnt, pos_cnt = 0, 0
+    local has_required_positional = false
     for _, arg in ipairs(self.arg_list) do
         if arg.is_flag then
             flag_cnt = flag_cnt + 1
         else
             pos_cnt = pos_cnt + 1
+
+            if arg.required then
+                has_required_positional = true
+            end
         end
     end
 
     local nargs
-    if flag_cnt > 0 then
+    if flag_cnt + pos_cnt == 0 then
+        nargs = 0
+    elseif flag_cnt > 0 then
         nargs = "*"
     elseif pos_cnt > 1 then
         nargs = "*"
     elseif pos_cnt == 1 then
-        nargs = "1"
+        nargs = has_required_positional and 1 or "?"
     end
+
+    return nargs
+end
+
+function Command:register()
+    if self.name:len() == 0 then return end
 
     local options = {
         range = self.range,
-        nargs = nargs,
+        nargs = self:_get_cmd_nargs(),
         complete = self:_make_completor(),
     }
 
