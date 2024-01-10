@@ -52,6 +52,9 @@ Default config value and introduction of each option can be found [here](https:/
 
 Check out `:help mongosh-nvim` for documentation.
 
+Basically, this plugin provides command `:Mongo` as entrance, and several
+subcommands that actually do something.
+
 Overview video:
 
 [![usage overview](https://i.ytimg.com/vi/lnBtr-dtoAk/maxresdefault.jpg)](https://www.youtube.com/watch?v=lnBtr-dtoAk)
