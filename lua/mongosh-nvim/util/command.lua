@@ -81,11 +81,12 @@ end
 -- }
 -- ```
 ---@param args string[]
+---@param start_index integer
 ---@return mongo.RawParsedArgs
-local function parse_fargs(args)
+local function parse_fargs(args, start_index)
     local parsed_args = {}
 
-    local consume_index = 1
+    local consume_index = start_index
     local positional_index = 1
     local total_cnt = #args
 
@@ -106,66 +107,6 @@ local function parse_fargs(args)
     end
 
     return parsed_args
-end
-
--- ----------------------------------------------------------------------------
--- Completion
-
--- flag_completion is a simple completion function for command flags.
----@param flag_list string[] # e.g. { "-a", "--bar" }
----@param arg_lead string
----@param cmd_line string
----@return string[]
-local function flag_completion(flag_list, arg_lead, cmd_line, _)
-    local result = {}
-    if arg_lead:len() == 0 then
-        return result
-    end
-
-    for _, flag in ipairs(flag_list) do
-        local is_picked = false
-
-        if arg_lead == "-" then
-            is_picked = flag:sub(1, 1) == "-" and flag:sub(1, 2) ~= "--"
-        elseif arg_lead == "--" then
-            is_picked = flag:sub(1, 2) == "--"
-        else
-            is_picked = str_util.starts_with(flag, arg_lead)
-        end
-
-        is_picked = is_picked and cmd_line:find(flag) == nil
-
-        if is_picked then
-            result[#result + 1] = flag
-        end
-    end
-
-    return result
-end
-
----@alias mongo.CommandCompletorFunc fun(arg_lead: string, cmd_line, string, cursor_pos: integer): string[]
-
----@param arg_list mongo.CommandArg[]
----@return mongo.CommandCompletorFunc
-local function flag_completor_maker(arg_list)
-    local flag_list = {}
-    for _, arg in ipairs(arg_list) do
-        local is_flag = arg.is_flag
-        local long = arg.name
-        local short = arg.short
-
-        if is_flag and long then
-            flag_list[#flag_list + 1] = "--" .. long
-        end
-
-        if is_flag and short then
-            flag_list[#flag_list + 1] = "-" .. short
-        end
-    end
-
-    return function(arg_lead, cmd_line, cursor_pos)
-        return flag_completion(flag_list, arg_lead, cmd_line, cursor_pos)
-    end
 end
 
 -- ----------------------------------------------------------------------------
@@ -231,7 +172,7 @@ function Command:new(args)
     obj.range = args.range or false
     obj.no_unused_warning = args.no_unused_warning
 
-    obj.action = args.action or function() end
+    obj.action = args.action
 
     local arg_list = args.arg_list
     obj.arg_list = arg_list and vim.deepcopy(args.arg_list) or {}
@@ -261,6 +202,26 @@ end
 ---@return mongo.Command?
 function Command:_get_sub_cmd(name)
     return self._subcommands[name]
+end
+
+-- _redirect_to_sub_cmd_by_args searchs for proper subcommand to handle input
+-- arugment list.
+-- Returns target subcommand and index to first unhandled argument left in list.
+---@param cur_index integer # index of first unhandled argument
+---@return mongo.Command
+---@return integer new_index
+function Command:_redirect_to_sub_cmd_by_args(args, cur_index)
+    local first_arg = args[cur_index]
+    if not first_arg or check_is_flag_arg(first_arg) then
+        return self, cur_index
+    end
+
+    local subcmd = self:_get_sub_cmd(first_arg)
+    if not subcmd then
+        return self, cur_index
+    end
+
+    return subcmd:_redirect_to_sub_cmd_by_args(args, cur_index + 1)
 end
 
 -- _extract_arg takes value out of parsed argument table.
@@ -363,54 +324,143 @@ function Command:_check_unused_args(raw_parsed)
     return #msg > 0 and table.concat(msg, "\n") or nil
 end
 
--- _make_command_callback generates a uesr command callback with command's
--- argument list and action.
-function Command:_make_command_callback()
-    return function(args)
-        local raw_parsed = parse_fargs(args.fargs)
-        local parsed_args = {}
+-- _parse_args converts list of string into argument table suitable for calling
+-- command action.
+---@param args string[] # argument list
+---@param cur_index integer # index of first unhandled argument
+---@return string? err
+---@return table<string, any> parsed_args
+---@return mongo.RawParsedArgs unused_args
+function Command:_parse_args(args, cur_index)
+    local raw_parsed = parse_fargs(args, cur_index)
+    local parsed_args = {}
 
-        local pos_index, err = 0, nil
-        for _, arg in ipairs(self.arg_list) do
-            local value
-            err, value, pos_index = self:_extract_arg(raw_parsed, arg, pos_index)
+    local pos_index, err = 0, nil
+    for _, arg in ipairs(self.arg_list) do
+        local value
+        err, value, pos_index = self:_extract_arg(raw_parsed, arg, pos_index)
 
-            if err then break end
+        if err then break end
 
-            local key = arg.name:gsub("%-", "_")
-            parsed_args[key] = value
+        local key = arg.name:gsub("%-", "_")
+        parsed_args[key] = value
+    end
+
+    local unused_args = raw_parsed
+
+    if err then
+        return err, parsed_args, unused_args
+    end
+
+    if not self.no_unused_warning then
+        local unused_value_msg = self:_check_unused_args(unused_args)
+        if unused_value_msg then
+            log.info(unused_value_msg)
         end
+    end
 
-        if err then
-            log.warn(err)
-            return
-        end
+    return nil, parsed_args, unused_args
+end
 
-        local unused_args = raw_parsed
-        if not self.no_unused_warning then
-            local unused_value_msg = self:_check_unused_args(unused_args)
-            if unused_value_msg then
-                log.info(unused_value_msg)
-            end
-        end
+-- _run_as_user_command can be used in user command callback, takes user commnd
+-- argument table, runs command action.
+---@param args table
+function Command:_run_as_user_command(args)
+    local fargs = args.fargs
+    local cmd, cur_index = self:_redirect_to_sub_cmd_by_args(fargs, 1)
 
-        self.action(parsed_args, args, unused_args)
+    local action = cmd.action
+    if type(action) ~= "function" then return end
+
+    local err, parsed_args, unused_args = self:_parse_args(fargs, cur_index)
+    if err then
+        log.warn(err)
+    else
+        action(parsed_args, args, unused_args)
     end
 end
 
--- _make_completor returns a Vim user command completion function if current
--- command needs completion. If current command have neither arguments or
--- subcommands, `nil` will be returned.
----@return mongo.CommandCompletorFunc?
-function Command:_make_completor()
-    if #self.arg_list == 0 then return nil end
+---@param arg_lead string
+---@return string[]
+function Command:_complete_subcmd(arg_lead)
+    local result = {}
 
-    return flag_completor_maker(self.arg_list)
+    for name in pairs(self._subcommands) do
+        if arg_lead:len() == 0 or str_util.starts_with(name, arg_lead) then
+            result[#result + 1] = name
+        end
+    end
+
+    table.sort(result)
+
+    return result
+end
+
+---@param arg_lead string
+---@param cmd_line string
+---@return string[]
+function Command:_complete_flags(arg_lead, cmd_line)
+    local result = {}
+
+    local is_long_flag = arg_lead:sub(1, 2) == "--"
+    local is_short_flag = not is_long_flag and arg_lead:sub(1, 1) == "-"
+    if not is_long_flag and not is_short_flag then
+        return result
+    end
+
+    for _, arg in ipairs(self.arg_list) do
+        local flag
+        if not arg.is_flag then
+            -- pass
+        elseif is_long_flag then
+            flag = "--" .. arg.name
+        else
+            flag = arg.short and "-" .. arg.short
+        end
+
+        local is_picked = flag ~= nil
+            and str_util.starts_with(flag, arg_lead)
+            and cmd_line:find(flag) == nil
+
+        if is_picked then
+            result[#result + 1] = flag
+        end
+    end
+
+    table.sort(result)
+
+    return result
+end
+
+---@param arg_lead string
+---@param cmd_line string
+---@return string[]
+function Command:_cmd_completion(arg_lead, cmd_line)
+    local parts = vim.split(cmd_line, "%s")
+    local cmd = self:_redirect_to_sub_cmd_by_args(parts, 2)
+
+    local result = {}
+
+    vim.list_extend(result, cmd:_complete_subcmd(arg_lead))
+
+    vim.list_extend(result, cmd:_complete_flags(arg_lead, cmd_line))
+
+    return result
 end
 
 -- _get_cmd_narg returns command-nargs value of current command.
 ---@return string | number
 function Command:_get_cmd_nargs()
+    local subcmd_empty = true
+    for _ in pairs(self._subcommands) do
+        subcmd_empty = false
+        break
+    end
+
+    if not subcmd_empty then
+        return "*"
+    end
+
     local flag_cnt, pos_cnt = 0, 0
     local has_required_positional = false
     for _, arg in ipairs(self.arg_list) do
@@ -442,13 +492,23 @@ end
 function Command:register()
     if self.name:len() == 0 then return end
 
+    local nargs = self:_get_cmd_nargs()
+    local complete
+    if nargs and nargs ~= 0 then
+        complete = function(arg_lead, cmd_line)
+            return self:_cmd_completion(arg_lead, cmd_line)
+        end
+    end
+
     local options = {
         range = self.range,
-        nargs = self:_get_cmd_nargs(),
-        complete = self:_make_completor(),
+        nargs = nargs,
+        complete = complete,
     }
 
-    local callback = self:_make_command_callback()
+    local callback = function(args)
+        self:_run_as_user_command(args)
+    end
 
     local buffer = self.buffer
     if buffer then
@@ -467,12 +527,21 @@ end
 ---@field no_unused_warning? boolean
 --
 ---@field arg_list? mongo.CommandArg[]
----@field action mongo.CommandActionCallback
+---@field action? mongo.CommandActionCallback
+--
+---@field parent? mongo.Command
 
 ---@param args mongo.CommandCreationArg
 ---@return mongo.Command
 function M.new_cmd(args)
-    return Command:new(args)
+    local cmd = Command:new(args)
+
+    local parent = args.parent
+    if parent then
+        parent:add_sub_cmd { cmd }
+    end
+
+    return cmd
 end
 
 ---@param args mongo.CommandCreationArg
