@@ -118,6 +118,9 @@ end
 ---@return string[]
 local function flag_completion(flag_list, arg_lead, cmd_line, _)
     local result = {}
+    if arg_lead:len() == 0 then
+        return result
+    end
 
     for _, flag in ipairs(flag_list) do
         local is_picked = false
@@ -128,8 +131,9 @@ local function flag_completion(flag_list, arg_lead, cmd_line, _)
             is_picked = flag:sub(1, 2) == "--"
         else
             is_picked = str_util.starts_with(flag, arg_lead)
-            is_picked = is_picked and cmd_line:find(flag) == nil
         end
+
+        is_picked = is_picked and cmd_line:find(flag) == nil
 
         if is_picked then
             result[#result + 1] = flag
@@ -139,8 +143,10 @@ local function flag_completion(flag_list, arg_lead, cmd_line, _)
     return result
 end
 
+---@alias mongo.CommandCompletorFunc fun(arg_lead: string, cmd_line, string, cursor_pos: integer): string[]
+
 ---@param arg_list mongo.CommandArg[]
----@return fun(arg_lead: string, cmd_line, string, cursor_pos: integer): string[]
+---@return mongo.CommandCompletorFunc
 local function flag_completor_maker(arg_list)
     local flag_list = {}
     for _, arg in ipairs(arg_list) do
@@ -367,6 +373,16 @@ function Command:_make_command_callback()
     end
 end
 
+-- _make_completor returns a Vim user command completion function if current
+-- command needs completion. If current command have neither arguments or
+-- subcommands, `nil` will be returned.
+---@return mongo.CommandCompletorFunc?
+function Command:_make_completor()
+    if #self.arg_list == 0 then return nil end
+
+    return flag_completor_maker(self.arg_list)
+end
+
 function Command:register()
     if self.name:len() == 0 then return end
 
@@ -379,7 +395,6 @@ function Command:register()
         end
     end
 
-    local arg_cnt = flag_cnt + pos_cnt
     local nargs
     if flag_cnt > 0 then
         nargs = "*"
@@ -392,7 +407,7 @@ function Command:register()
     local options = {
         range = self.range,
         nargs = nargs,
-        complete = arg_cnt > 0 and flag_completor_maker(self.arg_list) or nil,
+        complete = self:_make_completor(),
     }
 
     local callback = self:_make_command_callback()
