@@ -434,6 +434,10 @@ end
 ---@param item mongo.ui.DBSideItem
 function UIDBSidebar:on_select_database(item)
     item:toggle_expansion()
+    if not item.expanded then
+        self:write_to_buffer()
+        return
+    end
 
     local names = api_core.get_collection_names(item.name)
     if names then
