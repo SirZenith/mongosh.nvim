@@ -27,4 +27,6 @@ M.CreateBufferStyle = {
     Never = "never",
 }
 
+M.DB_SIDEBAR_FILETYPE = "mongosh-nvim-db-sidebar"
+
 return M

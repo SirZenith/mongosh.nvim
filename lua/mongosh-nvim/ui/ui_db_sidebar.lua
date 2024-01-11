@@ -1,6 +1,7 @@
 local api_core = require "mongosh-nvim.api.core"
 local api_buffer = require "mongosh-nvim.api.buffer"
 local config = require "mongosh-nvim.config"
+local buffer_const = require "mongosh-nvim.constant.buffer"
 local hl_const = require "mongosh-nvim.constant.highlight"
 
 local api = vim.api
@@ -295,6 +296,7 @@ function UIDBSidebar:show()
     local bo = vim.bo[bufnr]
     bo.bufhidden = "delete"
     bo.buftype = "nofile"
+    bo.filetype = buffer_const.DB_SIDEBAR_FILETYPE
     bo.modifiable = false
 
     vim.cmd "leftabove vsplit"
