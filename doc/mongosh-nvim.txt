@@ -219,7 +219,16 @@ User config will be merge into default config. Options that not provided by
 user will use default value.
 
 -------------------------------------------------------------------------------
-4.1. Database List Sidebar Customization       *mongosh-nvim-db-sidebar-config*
+4.1. Database List Sidebar                            *mongosh-nvim-db-sidebar*
+
+User can use database list sidebar to browse available database on host, and
+collection names in a database.
+
+By expanding a database entry or selecting a collection entry, target database
+of current connection will automatically switch to corresponding database.
+
+Additionally, selecting a collection by pressing enter will create a query
+buffer on that collection.
 
 `sidebar` section in configuration file modifies the looking of sidebar
 elements.
