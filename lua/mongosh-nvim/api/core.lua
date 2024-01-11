@@ -11,13 +11,12 @@ local loop = vim.loop
 local M = {}
 
 M.EventType = {
-    collection_list_update = "collection_list_update",
+    collection_list_update = "collection_list_update", -- fun(db: string)
 }
 
 M.emitter = event_util.EventEmitter:new("api.core", M.EventType)
 
--- try_append_flag appends flag-value pair to argument buffer list if value is
--- not `nil`.
+-- Append flag-value pair to argument buffer list if the value is not `nil`.
 ---@param buffer string[]
 ---@param flag string
 ---@param value any
@@ -32,7 +31,7 @@ end
 
 local cached_tmpfile_name = nil ---@type string | nil
 
--- save_tmp_script_file writes script snippet to temporary file before running.
+-- Write script snippet to temporary file before running.
 ---@param script string
 ---@param callback fun(tmpfile_name?: string)
 function M.save_tmp_script_file(script, callback)
@@ -47,8 +46,8 @@ function M.save_tmp_script_file(script, callback)
     end)
 end
 
--- get_connection_args returns basic argument, for example authentication info,
--- for current connection.
+-- Return basic argument, for example authentication info, for current
+-- connection.
 ---@return string[]
 function M.get_connection_args()
     local args = {}
@@ -81,8 +80,8 @@ end
 ---@field db_address? string # database address for connection.
 ---@field callback fun(result: mongo.RunCmdResult) # callback for handling evaluation result.
 
--- call_mongosh calls mongosh executable with given arguments.
--- Command will be evaluated asynchronously.
+-- Call mongosh executable with given arguments. Command will be evaluated
+-- asynchronously.
 ---@param args mongo.RunCmdArgs
 function M.call_mongosh(args)
     local executable = config.executable
@@ -129,8 +128,8 @@ function M.call_mongosh(args)
     end)
 end
 
--- run_raw_script sends script snippet to last connected database collection if no
--- host is provided.
+-- Sends script snippet to last connected database collection if no database
+-- address is provided.
 -- **Note**: Script content is sent to mongosh via command line directly. If snippet is too
 -- long, this function might fail due to OS limitation.
 ---@param args mongo.RunScriptArgs
@@ -149,8 +148,8 @@ function M.run_raw_script(args)
     }
 end
 
--- run_script takes script snippet and run it on last connected database collection
--- if no host is provide.
+-- Take script snippet and run it on last connected database collection if no
+-- database address is provide.
 -- Before running the snippet, function will first write it to temporary file,
 -- this is for avoiding limitation of maximum command line argument length.
 ---@param args mongo.RunScriptArgs
@@ -174,9 +173,9 @@ end
 -- ----------------------------------------------------------------------------
 -- Connecting
 
--- set_connection_flags_by_list treats every two arguments in input list as
--- flag-value pair, and sotre as raw connection flag.
--- Extra flag with no paired value takes no effect on internal flag sotrage.
+-- Treat every two arguments in input list as flag-value pair, and write them 
+-- into stored connection flag map.
+-- Extra flag with no paired value is ignored.
 ---@param args string[]
 function M.set_connection_flags_by_list(args)
     local len = #args
@@ -194,7 +193,7 @@ function M.set_connection_flags_by_list(args)
     end
 end
 
--- set_connection_flags_by_table update connection raw flags with given table.
+-- Update stored connection raw flags with given table.
 ---@param args table<string, string>
 function M.set_connection_flags_by_table(args)
     for flag, value in pairs(args) do
@@ -202,13 +201,13 @@ function M.set_connection_flags_by_table(args)
     end
 end
 
--- get_connection_flags returns a copy stored connection raw flag map.
+-- Return a copy of stored connection raw flag map.
 ---@return table<string, string>
 function M.get_connection_flags()
     return mongosh_state.get_raw_flag_map()
 end
 
--- clear_connection_flags clears all stored connection raw falgs.
+-- Clear all stored connection raw falgs.
 function M.clear_connection_flags()
     mongosh_state.clear_all_raw_flags()
 end
@@ -220,7 +219,7 @@ end
 ---@field password? string
 ---@field auth_source? string
 
--- connect connects to give host, and get list of available database name from host.
+-- Connect to give host, and query names of available database from it.
 ---@param args mongo.ConnectArgs
 ---@param callback fun(err?: string)
 function M.connect(args, callback)
@@ -253,7 +252,7 @@ end
 -- ----------------------------------------------------------------------------
 -- Script operation
 
--- do_execution runs a script snippet and watis for its result.
+-- Send given code snippet to mongosh without any preprocessing.
 ---@param script_snippet string
 ---@param callback fun(err: string?, result: string)
 ---@param  fallback_err_msg? string
@@ -274,7 +273,7 @@ function M.do_execution(script_snippet, callback, fallback_err_msg)
     }
 end
 
--- do_query first wraps given query snippet in a query template then executes the snippet.
+-- Wrap given query snippet in a query template then send it to mongosh.
 ---@param query_snippet string
 ---@param callback fun(err: string?, result: string)
 ---@param  fallback_err_msg? string
@@ -287,6 +286,7 @@ function M.do_query(query_snippet, callback, fallback_err_msg)
     M.do_execution(script_snippet, callback, fallback_err_msg or "query failed")
 end
 
+-- Fill given edit snippet into `replaceOne` call template and send it to mongosh.
 ---@param edit_snippet string
 ---@param callback fun(err: string?, result: string)
 ---@param  fallback_err_msg? string
@@ -302,6 +302,7 @@ end
 -- ----------------------------------------------------------------------------
 -- State data access
 
+-- Set database target of current connection to `db`.
 ---@param db string
 ---@return string? err
 function M.switch_to_db(db)
@@ -327,18 +328,20 @@ function M.switch_to_db(db)
     return nil
 end
 
+-- Return database address of current connection.
 ---@return string
 function M.get_cur_db_addr()
     return mongosh_state.get_db_addr()
 end
 
+-- Return database name for current connection. If no database has been connected
+-- yet, then this function returns `nil`.
 ---@return string?
 function M.get_cur_db()
     return mongosh_state.get_db()
 end
 
--- get_filtered_db_list returns names of available databases except ignored
--- databases listed in config.
+-- Return names of available databases except ones that gets marked as ignored.
 ---@return string[] db_names
 function M.get_filtered_db_list()
     local full_list = mongosh_state.get_db_names()
@@ -391,19 +394,18 @@ function M.update_collection_list(db, callback)
     M.run_raw_script {
         script = script_const.CMD_LIST_COLLECTIONS,
         callback = function(result)
+            local err
             if result.code ~= 0 then
-                wrapped_callback("failed to get collection list\n" .. result.stderr)
+                err = "failed to get collection list\n" .. result.stderr
                 return
+            else
+                local collections = vim.fn.json_decode(result.stdout)
+                table.sort(collections)
+                mongosh_state.set_collection_names(db, collections)
             end
 
-            local collections = vim.fn.json_decode(result.stdout)
-            table.sort(collections)
-
-            mongosh_state.set_collection_names(db, collections)
-
-            M.emitter:emit(M.EventType.collection_list_update)
-
-            wrapped_callback()
+            M.emitter:emit(M.EventType.collection_list_update, db)
+            wrapped_callback(err)
         end,
     }
 end

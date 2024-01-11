@@ -327,22 +327,26 @@ function UIDBSidebar:hide()
     end
 end
 
-function UIDBSidebar:on_collection_list_update()
-    local need_refresh = false
-
+---@param db string
+function UIDBSidebar:on_collection_list_update(db)
+    local target
     for _, item in ipairs(self.databases) do
-        local names = api_core.get_collection_names(item.name)
-
-        if names then
-            item.collections = names
-            item.is_loading = false
-            need_refresh = need_refresh or item.expanded
+        if item.name == db then
+            target = item
+            break
         end
     end
 
-    if need_refresh then
-        self:write_to_buffer()
+    if not target then return end
+
+    target.is_loading = false
+
+    local names = api_core.get_collection_names(db)
+    if names then
+        target.collections = names
     end
+
+    self:write_to_buffer()
 end
 
 -- Update content of sidebar buffer
