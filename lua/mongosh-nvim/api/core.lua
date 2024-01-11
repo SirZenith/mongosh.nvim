@@ -397,7 +397,6 @@ function M.update_collection_list(db, callback)
             local err
             if result.code ~= 0 then
                 err = "failed to get collection list\n" .. result.stderr
-                return
             else
                 local collections = vim.fn.json_decode(result.stdout)
                 table.sort(collections)
