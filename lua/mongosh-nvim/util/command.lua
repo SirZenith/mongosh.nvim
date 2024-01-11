@@ -129,7 +129,7 @@ local arg_value_converter_map = {
 
         if type(value) == "string" then
             if value == "0"
-                or value:len() == 0
+                or value == ""
                 or value:lower() == "false"
             then
                 return false
@@ -388,7 +388,7 @@ function Command:_complete_subcmd(arg_lead)
     local result = {}
 
     for name, cmd in pairs(self._subcommands) do
-        local is_match = arg_lead:len() == 0 or str_util.starts_with(name, arg_lead)
+        local is_match = arg_lead == "" or str_util.starts_with(name, arg_lead)
         local is_available = not cmd.available_checker or cmd.available_checker()
 
         if is_match and is_available then
@@ -495,7 +495,7 @@ function Command:_get_cmd_nargs()
 end
 
 function Command:register()
-    if self.name:len() == 0 then return end
+    if self.name == "" then return end
 
     local nargs = self:_get_cmd_nargs()
     local complete

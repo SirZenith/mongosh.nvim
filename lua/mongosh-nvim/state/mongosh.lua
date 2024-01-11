@@ -12,6 +12,7 @@ local raw_flag_map = {} ---@type table<string, string>
 
 local username = nil ---@type string?
 local password = nil ---@type string?
+local auth_source = nil ---@type string?
 
 local addr_data = DbAddressData:new()
 
@@ -118,7 +119,7 @@ end
 -- for connection, `nil` will be returned.
 ---@return string? username
 function M.get_username()
-    if not username or username:len() == 0 then return nil end
+    if not username or username == "" then return nil end
     return str_util.unscramble(username)
 end
 
@@ -133,8 +134,20 @@ end
 -- for connection, `nil` will be returned.
 ---@return string? password
 function M.get_password()
-    if not password or password:len() == 0 then return nil end
+    if not password or password == "" then return nil end
     return str_util.unscramble(password)
+end
+
+-- Set authentication source database for connection connection.
+---@param value? string
+function M.set_auth_source(value)
+    auth_source = value
+end
+
+-- Get authentication database for current connection.
+function M.get_auth_source()
+    if not auth_source or auth_source == "" then return nil end
+    return auth_source
 end
 
 -- ----------------------------------------------------------------------------
@@ -201,6 +214,11 @@ end
 ---@param db string # database name
 function M.reset_collection_name_cache(db)
     collection_name_cache[db] = nil
+end
+
+-- Clear cached collection name list for all database
+function M.reset_all_collection_name_cache()
+    collection_name_cache = {}
 end
 
 -- reset_db_cache clears cached data for connection.

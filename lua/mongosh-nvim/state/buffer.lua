@@ -849,6 +849,8 @@ function MongoBuffer:refresh()
     refresher(self, function(err)
         if err then
             log.warn(err)
+        else
+            log.info("buffer refreshed")
         end
     end)
 end

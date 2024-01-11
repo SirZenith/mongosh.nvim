@@ -29,7 +29,6 @@ cmd_util.new_cmd {
         { name = "port",                          is_flag = true, is_dummy = true },
 
         -- Authentication
-        { name = "authenticationDatabase",        is_flag = true, is_dummy = true },
         { name = "authenticationMechanism",       is_flag = true, is_dummy = true },
         { name = "awsIamSessionToken",            is_flag = true, is_dummy = true },
         { name = "gssapiServiceName",             is_flag = true, is_dummy = true },
@@ -91,6 +90,7 @@ cmd_util.new_cmd {
 
             username = "",
             password = "",
+            auth_source = "",
         }
 
         util.do_async_steps {
@@ -117,6 +117,19 @@ cmd_util.new_cmd {
                 local input = vim.fn.inputsecret("Password: ")
                 connect_args.password = input
                 next_step()
+            end,
+
+            -- authentication source database input 
+            function(next_step)
+                if not args.with_auth then
+                    next_step()
+                    return
+                end
+
+                vim.ui.input({ prompt = "Auth Source DB: " }, function(input)
+                    connect_args.auth_source = input
+                    next_step()
+                end)
             end,
 
             -- connecting
@@ -147,7 +160,7 @@ cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "collection",
     available_checker = check_db_selected,
-    action = api_ui.select_collection_ui_buffer,
+    action = api_ui.select_collection_ui_list,
 }
 
 -- ----------------------------------------------------------------------------

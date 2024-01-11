@@ -24,9 +24,16 @@ end
 -- ----------------------------------------------------------------------------
 
 -- Create a new query buffer for given collection name.
+---@param db string # database name
 ---@param collection string # collection name
 ---@param win? integer # if not `nil`, buffer will be displayed in given window.
-function M.create_query_buffer(collection, win)
+function M.create_query_buffer(db, collection, win)
+    local err = api_core.switch_to_db(db)
+    if err then
+        log.warn(err)
+        return
+    end
+
     local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.CollectionList, {})
     mbuf:write_result {
         win = win,
@@ -66,6 +73,7 @@ function M.run_buffer_executation(bufnr, args)
     }
 
     if supported_types[mbuf.type] then
+        mbuf:change_type_to(BufferType.Execute)
         mbuf:write_result(args)
     else
         log.warn("current buffer doesn't support Execute commnad")

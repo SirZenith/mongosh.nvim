@@ -61,6 +61,7 @@ function M.get_connection_args()
 
     try_append_flag(args, "--username", mongosh_state.get_username())
     try_append_flag(args, "--password", mongosh_state.get_password())
+    try_append_flag(args, "--authenticationDatabase", mongosh_state.get_auth_source())
 
     return args
 end
@@ -108,6 +109,9 @@ function M.call_mongosh(args)
             stdio = { nil, stdout, stderr }
         },
         vim.schedule_wrap(function(code, signal)
+            if code ~= 0 then
+                vim.print(args.args)
+            end
             args.callback {
                 code = code,
                 signal = signal,
@@ -217,6 +221,7 @@ end
 --
 ---@field username? string
 ---@field password? string
+---@field auth_source? string
 
 -- connect connects to give host, and get list of available database name from host.
 ---@param args mongo.ConnectArgs
@@ -227,6 +232,7 @@ function M.connect(args, callback)
 
     mongosh_state.set_username(args.username)
     mongosh_state.set_password(args.password)
+    mongosh_state.set_auth_source(args.auth_source)
 
     M.run_raw_script {
         script = script_const.CMD_LIST_DBS,
@@ -239,6 +245,8 @@ function M.connect(args, callback)
             local db_names = vim.fn.json_decode(result.stdout)
             table.sort(db_names)
             mongosh_state.set_db_names(db_names)
+
+            mongosh_state.reset_all_collection_name_cache()
 
             callback()
         end,
@@ -258,7 +266,7 @@ function M.do_execution(script_snippet, callback, fallback_err_msg)
         callback = function(result)
             if result.code ~= 0 then
                 local err = result.stderr
-                if err:len() == 0 then
+                if err == "" then
                     err = fallback_err_msg or "execution failed"
                 end
                 callback(result.stderr, "")
@@ -296,6 +304,31 @@ end
 
 -- ----------------------------------------------------------------------------
 -- State data access
+
+---@param db string
+---@return string? err
+function M.switch_to_db(db)
+    local full_list = mongosh_state.get_db_names()
+    if #full_list == 0 then
+        return "no available database found"
+    end
+
+    local is_found = false
+    for _, name in ipairs(full_list) do
+        if name == db then
+            is_found = true
+            break
+        end
+    end
+
+    if not is_found then
+        return "database is not available: " .. db
+    end
+
+    mongosh_state.set_db(db)
+
+    return nil
+end
 
 ---@return string
 function M.get_cur_db_addr()
@@ -344,19 +377,25 @@ end
 ---@param db string
 ---@param callback? fun(err?: string)
 function M.update_collection_list(db, callback)
-    mongosh_state.set_db(db)
+    local wrapped_callback = function(err)
+        if callback then
+            callback(err)
+        elseif err then
+            log.warn(err)
+        end
+    end
+
+    local switch_err = M.switch_to_db(db)
+    if switch_err then
+        wrapped_callback(switch_err)
+        return
+    end
 
     M.run_raw_script {
         script = script_const.CMD_LIST_COLLECTIONS,
         callback = function(result)
             if result.code ~= 0 then
-                local err = "failed to get collection list\n" .. result.stderr
-                if callback then
-                    callback(err)
-                else
-                    log.warn(err)
-                end
-
+                wrapped_callback("failed to get collection list\n" .. result.stderr)
                 return
             end
 
@@ -367,9 +406,7 @@ function M.update_collection_list(db, callback)
 
             M.emitter:emit(M.EventType.collection_list_update)
 
-            if callback then
-                callback()
-            end
+            wrapped_callback()
         end,
     }
 end

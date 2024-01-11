@@ -137,7 +137,7 @@ end
 ---@return string? host # host value of database address.
 function DbAddressData:get_host()
     local host = self._host
-    if not host or host:len() == 0 then return nil end
+    if not host or host == "" then return nil end
 
     return str_util.unscramble(host)
 end
@@ -176,7 +176,7 @@ end
 ---@return string? param # parameter query string for database address.
 function DbAddressData:get_param()
     local param = self._param
-    if not param or param:len() == 0 then return nil end
+    if not param or param == "" then return nil end
 
     return str_util.unscramble(param)
 end

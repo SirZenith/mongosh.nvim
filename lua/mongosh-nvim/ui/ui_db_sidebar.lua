@@ -423,7 +423,7 @@ function UIDBSidebar:select_under_cursor()
     if result.type == "database" then
         self:on_select_database(target_item)
     elseif result.type == "collection" then
-        self:on_select_collection(result.name)
+        self:on_select_collection(target_item, result.name)
     end
 end
 
@@ -448,10 +448,12 @@ function UIDBSidebar:on_select_database(item)
     end
 end
 
+---@param item mongo.ui.DBSideItem
 ---@param collection string
-function UIDBSidebar:on_select_collection(collection)
+function UIDBSidebar:on_select_collection(item, collection)
     local preview_winnr = self:get_preview_win()
-    api_buffer.create_query_buffer(collection, preview_winnr)
+    api_buffer.create_query_buffer(item.name, collection, preview_winnr)
+    self:write_to_buffer()
 end
 
 -- ----------------------------------------------------------------------------
