@@ -1,7 +1,5 @@
 # mongosh.nvim
 
-This plugin is inspired by [jrop/mongo.nvim](https://github.com/jrop/mongo.nvim).
-
 <b>Notice</b>: still in early stage of development, might be breaking change.
 
 ---
@@ -57,4 +55,8 @@ subcommands that actually do something.
 
 Screen shot (click to jump to video):
 
-[![screen shot](./img/screen_shot.png)](https://www.youtube.com/watch?v=lnBtr-dtoAk)
+[![screen shot](./img/screen_shot.png)](https://youtu.be/t8gPMM5TuyI)
+
+## Thanks
+
+This plugin is inspired by [jrop/mongo.nvim](https://github.com/jrop/mongo.nvim).
