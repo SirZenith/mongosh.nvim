@@ -258,10 +258,11 @@ function UIDBSidebar:get_buffer()
     if not api.nvim_buf_is_valid(bufnr)
         or not api.nvim_buf_is_loaded(bufnr)
     then
+        bufnr = nil
         self:destory()
     end
 
-    return self.bufnr
+    return bufnr
 end
 
 ---@return integer? winnr
@@ -319,10 +320,11 @@ end
 
 function UIDBSidebar:hide()
     local winnr = self.winnr
-    if not winnr then return end
-
     self.winnr = nil
-    api.nvim_win_hide(winnr)
+
+    if winnr and api.nvim_win_is_valid(winnr) then
+        api.nvim_win_hide(winnr)
+    end
 end
 
 function UIDBSidebar:on_collection_list_update()
@@ -460,7 +462,7 @@ local sidebar_map = {} ---@type table<integer, mongo.ui.UIDBSidebar>
 function M.show()
     local tabpage = api.nvim_get_current_tabpage()
     local sidebar = sidebar_map[tabpage]
-    if sidebar then return end
+    if sidebar and sidebar:is_valid() then return end
 
     local winnr = api.nvim_get_current_win()
     sidebar = UIDBSidebar:new(winnr)
@@ -487,7 +489,7 @@ function M.toggle()
     local tabpage = api.nvim_get_current_tabpage()
     local sidebar = sidebar_map[tabpage]
 
-    if sidebar then
+    if sidebar and sidebar:is_valid() then
         M.hide()
     else
         M.show()

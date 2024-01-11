@@ -1,3 +1,4 @@
+local api_core = require "mongosh-nvim.api.core"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local log = require "mongosh-nvim.log"
 local buffer_state = require "mongosh-nvim.state.buffer"
@@ -119,6 +120,12 @@ end
 ---@param bufnr integer
 ---@param args mongo.RunBufferEditArgs
 function M.run_buffer_edit(bufnr, args)
+    local db = api_core.get_cur_db()
+    if not db then
+        log.warn("you need to first connect to a database to do edit")
+        return
+    end
+
     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
         or buffer_state.wrap_with_mongo_buffer(BufferType.Edit, bufnr)
 

@@ -44,7 +44,7 @@ function M.select_database_ui()
     local db_names = api_core.get_filtered_db_list()
 
     if #db_names == 0 then
-        log.info("only ignored databases are found")
+        log.info("not connected to host or all available databases are mark ignored")
         return
     end
 
@@ -52,6 +52,7 @@ function M.select_database_ui()
         db_names,
         { prompt = "Select a database:" },
         function(db)
+            if db == "" then return end
             mongosh_state.set_db(db)
             api_core.update_collection_list(db)
         end
@@ -119,15 +120,15 @@ function M.select_collection_ui_list()
 end
 
 -- Toggle database side bar.
-function M.toggle_db_side_bar()
+function M.toggle_db_sidebar()
     ui_db_sidebar.toggle()
 end
 
-function M.show_db_side_bar()
+function M.show_db_sidebar()
     ui_db_sidebar.show()
 end
 
-function M.hide_db_side_bar()
+function M.hide_db_sidebar()
     ui_db_sidebar.hide()
 end
 

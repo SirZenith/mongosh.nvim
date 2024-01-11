@@ -785,13 +785,15 @@ end
 -- write_result trys to make buffer and window and write result to them.
 ---@param args? table<string, any>
 function MongoBuffer:write_result(args)
+    args = args or {}
+
     local result_gen = self:get_result_generator()
     if not result_gen then
         log.error("not resul generator found for buffer type: " .. self.type)
         return
     end
 
-    result_gen(self, args or {}, function(result)
+    result_gen(self, args, function(result)
         if not result.type then
             log.warn("failed to generate result")
             return

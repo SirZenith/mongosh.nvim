@@ -6,6 +6,11 @@ local api_buffer = require "mongosh-nvim.api.buffer"
 local api_core = require "mongosh-nvim.api.core"
 local api_ui = require "mongosh-nvim.api.ui"
 
+---@return boolean
+local function check_db_selected()
+    return api_core.get_cur_db() ~= nil
+end
+
 local cmd_mongo = cmd_util.new_cmd { name = "Mongo" }
 
 -- ----------------------------------------------------------------------------
@@ -123,7 +128,7 @@ cmd_util.new_cmd {
                         return
                     end
 
-                    api_ui.show_db_side_bar()
+                    api_ui.show_db_sidebar()
 
                     next_step()
                 end)
@@ -141,9 +146,7 @@ cmd_util.new_cmd {
 cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "collection",
-    available_checker = function()
-        return api_core.get_cur_db() ~= nil
-    end,
+    available_checker = check_db_selected,
     action = api_ui.select_collection_ui_buffer,
 }
 
@@ -181,9 +184,7 @@ cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "edit",
     range = true,
-    available_checker = function()
-        return api_core.get_cur_db() ~= nil
-    end,
+    available_checker = check_db_selected,
     action = function(_, orig_args)
         api_buffer.run_buffer_edit(
             vim.api.nvim_win_get_buf(0),
@@ -213,6 +214,7 @@ local cmd_mongo_new = cmd_util.new_cmd {
 cmd_util.new_cmd {
     parent = cmd_mongo_new,
     name = "query",
+    available_checker = check_db_selected,
     action = api_ui.select_collection_ui_list,
 }
 
@@ -223,6 +225,7 @@ cmd_util.new_cmd {
         { name = "collection", is_flag = true, short = "c",    required = true },
         { name = "id",         is_flag = true, required = true },
     },
+    available_checker = check_db_selected,
     action = function(args)
         local collection = args.collection or ""
         local id = args.id or ""
@@ -237,19 +240,25 @@ cmd_util.new_cmd {
 local cmd_mongo_sidebar = cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "sidebar",
-    action = api_ui.toggle_db_side_bar,
+    action = api_ui.toggle_db_sidebar,
 }
 
 cmd_util.new_cmd {
     parent = cmd_mongo_sidebar,
     name = "show",
-    action = api_ui.show_db_side_bar,
+    action = api_ui.show_db_sidebar,
 }
 
 cmd_util.new_cmd {
     parent = cmd_mongo_sidebar,
     name = "hide",
-    action = api_ui.hide_db_side_bar,
+    action = api_ui.hide_db_sidebar,
+}
+
+cmd_util.new_cmd {
+    parent = cmd_mongo_sidebar,
+    name = "toggle",
+    action = api_ui.toggle_db_sidebar,
 }
 
 -- ----------------------------------------------------------------------------
