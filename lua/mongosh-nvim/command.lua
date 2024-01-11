@@ -4,6 +4,7 @@ local cmd_util = require "mongosh-nvim.util.command"
 
 local api_buffer = require "mongosh-nvim.api.buffer"
 local api_core = require "mongosh-nvim.api.core"
+local api_buffer = require "mongosh-nvim.api.buffer"
 local api_ui = require "mongosh-nvim.api.ui"
 
 ---@return boolean
@@ -119,7 +120,7 @@ cmd_util.new_cmd {
                 next_step()
             end,
 
-            -- authentication source database input 
+            -- authentication source database input
             function(next_step)
                 if not args.with_auth then
                     next_step()
@@ -222,6 +223,14 @@ cmd_util.new_cmd {
 local cmd_mongo_new = cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "new"
+}
+
+cmd_util.new_cmd {
+    parent = cmd_mongo_new,
+    name = "execute",
+    action = function()
+        api_buffer.create_execute_buffer()
+    end,
 }
 
 cmd_util.new_cmd {

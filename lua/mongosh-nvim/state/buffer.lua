@@ -104,6 +104,18 @@ local buffer_option_setup_func_map = {
             mbuf:write_result()
         end, { buffer = bufnr })
     end,
+    [BufferType.Execute] = function(mbuf)
+        local bufnr = mbuf:get_bufnr()
+        if not bufnr then return end
+
+        local bo = vim.bo[bufnr]
+
+        bo.bufhidden = "delete"
+        bo.buflisted = false
+        bo.buftype = "nofile"
+
+        bo.filetype = "typescript"
+    end,
     [BufferType.Query] = function(mbuf)
         local bufnr = mbuf:get_bufnr()
         if not bufnr then return end

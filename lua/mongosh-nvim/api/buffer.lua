@@ -23,6 +23,12 @@ end
 
 -- ----------------------------------------------------------------------------
 
+-- Create a new execute buffer for given collection name.
+---@param win? integer # if not `nil`, buffer will be displayed in given window.
+function M.create_execute_buffer(win)
+    buffer_state.create_mongo_buffer(BufferType.Execute, {}, win)
+end
+
 -- Create a new query buffer for given collection name.
 ---@param db string # database name
 ---@param collection string # collection name

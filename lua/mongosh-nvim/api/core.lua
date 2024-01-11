@@ -109,9 +109,6 @@ function M.call_mongosh(args)
             stdio = { nil, stdout, stderr }
         },
         vim.schedule_wrap(function(code, signal)
-            if code ~= 0 then
-                vim.print(args.args)
-            end
             args.callback {
                 code = code,
                 signal = signal,
