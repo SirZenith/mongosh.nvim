@@ -48,6 +48,9 @@ if you like to.
 This plugin provides one user command `:Mongo` as entrance, each of its
 subcommand provides one actual functionality.
 
+For commands that take flag argument, enter `-` will give you completion of
+all short flags, and `--` will give you all long flags.
+
 `:Mongo connect`                                     *mongosh-nvim.cmd.connect*
 
     This command sets connection arguments for latter executation.
@@ -156,6 +159,12 @@ subcommand provides one actual functionality.
     For example, running this command in a query result buffer will run its
     query again, and query result will again be written to that buffer.
 
+-------------------------------------------------------------------------------
+
+`:Mongo new execute`                             *mongosh-nvim.cmd.new.execute*
+
+    Create a empty mongosh script sketch buffer.
+
 `:Mongo new query`                                 *mongosh-nvim.cmd.new.query*
 
     List all available collections in current database. Create a new query
@@ -168,6 +177,25 @@ subcommand provides one actual functionality.
     Available flags:
         - `collection`, `c`, target collection name.
         - `id`, document's `_id` field value.
+
+-------------------------------------------------------------------------------
+
+`:Mongo sidebar`                                     *mongosh-nvim.cmd.sidebar*
+
+    Toggle database list sidebar, the same as `:Mongo sidebar toggle`.
+
+`:Mongo sidebar show`                           *mongosh-nvim.cmd.sidebar.show*
+
+    Show database list sidebar, if a sidebar is already created in current
+    tabpage, then nothing happends.
+
+`:Mongo sidebar hide`
+
+    Hide database list sidebar in current tabpage.
+
+`:Mongo sidebar toggle`
+
+    Toggle database list sidebar in current tabpage.
 
 ===============================================================================
 4. Configuration                                   *mongosh-nvim-configuration*
@@ -189,5 +217,39 @@ User config table can be passed to plugin as follow:
 
 User config will be merge into default config. Options that not provided by
 user will use default value.
+
+-------------------------------------------------------------------------------
+4.1. Database List Sidebar Customization       *mongosh-nvim-db-sidebar-config*
+
+`sidebar` section in configuration file modifies the looking of sidebar
+elements.
+
+For example icon for each type of list entry. To display icon in default
+config you need to install one of Nerd Fonts. For more information about Nerd
+Fonts check https://www.nerdfonts.com/ .
+
+Sidebar uses highlight groups to bring colors to list elements. You will to
+setup highlight style by yourself. For example, following code set foreground
+color of database name in list to cyan:
+
+>lua
+    vim.api.nvim_set_hl(0, "MongoshDatabaseName", { fg = "#30E2FF" })
+<
+
+Supported highlight groups are:
+
+- `MongoshNormal`, window background and color of normal text.
+
+- `MongoshHostName`, color of host name.
+- `MongoshHostSymbol`, color of host address icon.
+
+- `MongoshDatabaseName`, color of database name.
+- `MongoshDatabaseSymbol`, color of database type icon.
+
+- `MongoshCollectionName`, color of collection name.
+- `MongoshCollectionSymbol`, color of collection type icon.
+
+- `MongoshCollectionLoading`, color of loading place holder text.
+- `MongoshCollectionLoadingSymbol`, color of loading indicator.
 
 vim:tw=78:ts=4:sw=4:et:ft=help:norl:
