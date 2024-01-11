@@ -395,6 +395,8 @@ local after_write_result_map = {
 local buffer_refresher_map = {
     [BufferType.CollectionList] = function(mbuf, callback)
         local collections = mongosh_state.get_collection_names()
+        if not collections then return end
+
         mbuf:set_lines(collections)
         callback()
     end,
@@ -588,19 +590,12 @@ function MongoBuffer:init_autocmd()
     local bufnr = self:get_bufnr()
     if not bufnr then return end
 
-    api.nvim_create_autocmd(
-        { "BufUnload" },
-        {
-            buffer = bufnr,
-            callback = function()
-                if api.nvim_get_current_buf() ~= bufnr then
-                    return
-                end
-
-                self:destory()
-            end
-        }
-    )
+    api.nvim_create_autocmd("BufUnload", {
+        buffer = bufnr,
+        callback = function()
+            self:destory()
+        end
+    })
 end
 
 function MongoBuffer:setup_buf_options()
@@ -648,11 +643,12 @@ function MongoBuffer:get_bufnr()
     return self.bufnr > 0 and self.bufnr or nil
 end
 
-function MongoBuffer:show()
+---@param win? integer # if not `nil`, buffer will be displayed in given window.
+function MongoBuffer:show(win)
     local bufnr = self:get_bufnr()
     if not bufnr then return end
 
-    local win = get_win_by_buf(bufnr, true)
+    win = win or get_win_by_buf(bufnr, true)
     if win then return end
 
     local cmd = "vsplit"
@@ -746,15 +742,16 @@ function MongoBuffer:make_result_win(bufnr)
 end
 
 -- make_result_buffer_obj creates a mongo buffer object for writing result.
+---@param win? integer # if not `nil`, buffer will be displayed in given window.
 ---@return string? err
 ---@return mongo.MongoBuffer?
-function MongoBuffer:make_result_buffer_obj()
+function MongoBuffer:make_result_buffer_obj(win)
     local buf = self:make_result_buffer()
     if buf <= 0 then
         return "failed to create new buffer", nil
     end
 
-    local win = self:make_result_win(buf)
+    win = win or self:make_result_win(buf)
     if win <= 0 then
         return "failed to get window for result buffer", nil
     end
@@ -800,7 +797,7 @@ function MongoBuffer:write_result(args)
             return
         end
 
-        local err, buf_obj = self:make_result_buffer_obj()
+        local err, buf_obj = self:make_result_buffer_obj(args.win)
         if err then
             log.warn(err)
             return
@@ -859,12 +856,13 @@ end
 -- create_mongo_buffer makes a new mongo buffer and show it on screen
 ---@param type mongo.BufferType
 ---@param lines string[]
+---@param win? integer # if not `nil`, buffer will be displayed in given window.
 ---@return mongo.MongoBuffer
-function M.create_mongo_buffer(type, lines)
+function M.create_mongo_buffer(type, lines, win)
     local mbuf = MongoBuffer:new(type)
 
     mbuf:set_lines(lines)
-    mbuf:show()
+    mbuf:show(win)
 
     return mbuf
 end

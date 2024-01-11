@@ -159,6 +159,7 @@ local arg_value_converter_map = {
 ---@field no_unused_warning? boolean # if `ture`, unused argument warnning will be ignored
 --
 ---@field action mongo.CommandActionCallback
+---@field available_checker? fun(): boolean
 ---@field arg_list mongo.CommandArg[]
 ---@field _subcommands table<string, mongo.Command>
 local Command = {}
@@ -173,6 +174,7 @@ function Command:new(args)
     obj.no_unused_warning = args.no_unused_warning
 
     obj.action = args.action
+    obj.available_checker = args.available_checker
 
     local arg_list = args.arg_list
     obj.arg_list = arg_list and vim.deepcopy(args.arg_list) or {}
@@ -385,8 +387,11 @@ end
 function Command:_complete_subcmd(arg_lead)
     local result = {}
 
-    for name in pairs(self._subcommands) do
-        if arg_lead:len() == 0 or str_util.starts_with(name, arg_lead) then
+    for name, cmd in pairs(self._subcommands) do
+        local is_match = arg_lead:len() == 0 or str_util.starts_with(name, arg_lead)
+        local is_available = not cmd.available_checker or cmd.available_checker()
+
+        if is_match and is_available then
             result[#result + 1] = name
         end
     end
@@ -528,6 +533,7 @@ end
 --
 ---@field arg_list? mongo.CommandArg[]
 ---@field action? mongo.CommandActionCallback
+---@field available_checker? fun(): boolean
 --
 ---@field parent? mongo.Command
 

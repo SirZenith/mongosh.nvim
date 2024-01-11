@@ -2,6 +2,7 @@ local log = require "mongosh-nvim.log"
 local util = require "mongosh-nvim.util"
 local cmd_util = require "mongosh-nvim.util.command"
 
+local api_buffer = require "mongosh-nvim.api.buffer"
 local api_core = require "mongosh-nvim.api.core"
 local api_ui = require "mongosh-nvim.api.ui"
 
@@ -122,7 +123,7 @@ cmd_util.new_cmd {
                         return
                     end
 
-                    api_ui.try_select_database_ui()
+                    api_ui.show_db_side_bar()
 
                     next_step()
                 end)
@@ -140,6 +141,9 @@ cmd_util.new_cmd {
 cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "collection",
+    available_checker = function()
+        return api_core.get_cur_db() ~= nil
+    end,
     action = api_ui.select_collection_ui_buffer,
 }
 
@@ -150,7 +154,7 @@ cmd_util.new_cmd {
     name = "execute",
     range = true,
     action = function(_, orig_args)
-        api_ui.run_buffer_executation(
+        api_buffer.run_buffer_executation(
             vim.api.nvim_win_get_buf(0),
             {
                 with_range = orig_args.range ~= 0,
@@ -164,7 +168,7 @@ cmd_util.new_cmd {
     name = "query",
     range = true,
     action = function(_, orig_args)
-        api_ui.run_buffer_query(
+        api_buffer.run_buffer_query(
             vim.api.nvim_win_get_buf(0),
             {
                 with_range = orig_args.range ~= 0,
@@ -177,8 +181,11 @@ cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "edit",
     range = true,
+    available_checker = function()
+        return api_core.get_cur_db() ~= nil
+    end,
     action = function(_, orig_args)
-        api_ui.run_buffer_edit(
+        api_buffer.run_buffer_edit(
             vim.api.nvim_win_get_buf(0),
             {
                 with_range = orig_args.range ~= 0,
@@ -192,7 +199,7 @@ cmd_util.new_cmd {
     name = "refresh",
     action = function()
         local bufnr = vim.api.nvim_win_get_buf(0)
-        api_ui.refresh_buffer(bufnr)
+        api_buffer.refresh_buffer(bufnr)
     end,
 }
 
@@ -220,16 +227,29 @@ cmd_util.new_cmd {
         local collection = args.collection or ""
         local id = args.id or ""
 
-        api_ui.create_edit_buffer(collection, id)
+        api_buffer.create_edit_buffer(collection, id)
     end,
 }
 
 -- ----------------------------------------------------------------------------
+-- Sidebar
 
-cmd_util.new_cmd {
+local cmd_mongo_sidebar = cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "sidebar",
+    action = api_ui.toggle_db_side_bar,
+}
+
+cmd_util.new_cmd {
+    parent = cmd_mongo_sidebar,
+    name = "show",
     action = api_ui.show_db_side_bar,
+}
+
+cmd_util.new_cmd {
+    parent = cmd_mongo_sidebar,
+    name = "hide",
+    action = api_ui.hide_db_side_bar,
 }
 
 -- ----------------------------------------------------------------------------

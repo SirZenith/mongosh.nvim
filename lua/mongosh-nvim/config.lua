@@ -85,13 +85,18 @@ M = {
         padding = 4,
 
         symbol = {
+            loading = {
+                collection = " ",
+            },
             expanded = {
                 indicator = " ",
+                host = "󰇄 ",
                 database = " ",
                 collection = "󱔘 ",
             },
             collapsed = {
                 indicator = " ",
+                host = "󰇄 ",
                 database = " ",
                 collection = "󱔗 ",
             },

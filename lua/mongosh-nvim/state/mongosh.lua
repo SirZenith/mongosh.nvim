@@ -168,12 +168,9 @@ function M.reset_db_name_cache()
 end
 
 -- set_collection_names update cached collection name list.
+---@param db string # database name, default value is database name of current connection.
 ---@param names string[]
----@param db? string # database name, default value is database name of current connection.
-function M.set_collection_names(names, db)
-    db = db or M.get_db()
-    if not db then return end
-
+function M.set_collection_names(db, names)
     local collections = {}
     for _, name in ipairs(names) do
         collections[#collections + 1] = name
@@ -182,18 +179,17 @@ function M.set_collection_names(names, db)
     collection_name_cache[db] = collections
 end
 
--- get_collection_names returns all available collection names in current database.
+-- Return all available collection names in current database.
 ---@param db? string # database name, default value is database name of current connection.
----@return string[] collection_names
+---@return string[]? collection_names
 function M.get_collection_names(db)
-    local results = {}
-
     db = db or M.get_db()
-    if db then return results end
+    if not db then return nil end
 
     local names = collection_name_cache[db]
-    if not names then return results end
+    if not names then return nil end
 
+    local results = {}
     for _, name in ipairs(names) do
         results[#results + 1] = name
     end

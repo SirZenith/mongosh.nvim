@@ -171,6 +171,7 @@ function M.run_script(args)
 end
 
 -- ----------------------------------------------------------------------------
+-- Connecting
 
 -- set_connection_flags_by_list treats every two arguments in input list as
 -- flag-value pair, and sotre as raw connection flag.
@@ -244,33 +245,8 @@ function M.connect(args, callback)
     }
 end
 
--- get_collections get name list of all available collections in current data base
----@param callback fun(err?: string)
----@param db? string
-function M.update_collection_list(callback, db)
-    if db then
-        mongosh_state.set_db(db)
-    end
-
-    M.run_raw_script {
-        script = script_const.CMD_LIST_COLLECTIONS,
-        callback = function(result)
-            if result.code ~= 0 then
-                callback("failed to get collection list\n" .. result.stderr)
-                return
-            end
-
-            local collections = vim.fn.json_decode(result.stdout)
-            table.sort(collections)
-
-            mongosh_state.set_collection_names(collections)
-
-            M.emitter:emit(M.EventType.collection_list_update)
-
-            callback()
-        end,
-    }
-end
+-- ----------------------------------------------------------------------------
+-- Script operation
 
 -- do_execution runs a script snippet and watis for its result.
 ---@param script_snippet string
@@ -319,6 +295,17 @@ function M.do_replace(edit_snippet, callback, fallback_err_msg)
 end
 
 -- ----------------------------------------------------------------------------
+-- State data access
+
+---@return string
+function M.get_cur_db_addr()
+    return mongosh_state.get_db_addr()
+end
+
+---@return string?
+function M.get_cur_db()
+    return mongosh_state.get_db()
+end
 
 -- get_filtered_db_list returns names of available databases except ignored
 -- databases listed in config.
@@ -342,6 +329,49 @@ function M.get_filtered_db_list()
     end
 
     return db_names
+end
+
+-- Get list of available collection in a database.
+-- If no collection list found for target database in local list, `nil` will be
+-- returned.
+---@param db? string # database name
+---@return string[]?
+function M.get_collection_names(db)
+    return mongosh_state.get_collection_names(db)
+end
+
+-- Send query to specified database to get list of available collections.
+---@param db string
+---@param callback? fun(err?: string)
+function M.update_collection_list(db, callback)
+    mongosh_state.set_db(db)
+
+    M.run_raw_script {
+        script = script_const.CMD_LIST_COLLECTIONS,
+        callback = function(result)
+            if result.code ~= 0 then
+                local err = "failed to get collection list\n" .. result.stderr
+                if callback then
+                    callback(err)
+                else
+                    log.warn(err)
+                end
+
+                return
+            end
+
+            local collections = vim.fn.json_decode(result.stdout)
+            table.sort(collections)
+
+            mongosh_state.set_collection_names(db, collections)
+
+            M.emitter:emit(M.EventType.collection_list_update)
+
+            if callback then
+                callback()
+            end
+        end,
+    }
 end
 
 return M

@@ -32,12 +32,16 @@ function DbAddressData:parse_addr(addr)
 
     local part_cnt = #parts
     local host_stem, db_stem, param_stem
-    if part_cnt == 1 then
-        db_stem = parts[1]
-    elseif part_cnt == 2 then
-        host_stem, db_stem, param_stem = parts[1], parts[2], parts[2]
+    if part_cnt == 0 then
+        -- pass
     elseif part_cnt > 2 then
         host_stem, db_stem, param_stem = parts[1], parts[2], parts[2]
+    elseif part_cnt == 2 then
+        host_stem, db_stem, param_stem = parts[1], parts[2], parts[2]
+    elseif parts[1]:find(":") then
+        host_stem = parts[1]
+    else
+        db_stem = parts[1]
     end
 
     local host, port
