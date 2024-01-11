@@ -12,7 +12,10 @@ local function check_db_selected()
     return api_core.get_cur_db() ~= nil
 end
 
-local cmd_mongo = cmd_util.new_cmd { name = "Mongo" }
+local cmd_mongo = cmd_util.new_cmd {
+    name = "Mongo",
+    range = true,
+}
 
 -- ----------------------------------------------------------------------------
 -- Connecting
