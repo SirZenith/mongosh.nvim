@@ -442,11 +442,13 @@ end
 ---@return string[]
 function Command:_cmd_completion(arg_lead, cmd_line)
     local parts = vim.split(cmd_line, "%s")
-    local cmd = self:_redirect_to_sub_cmd_by_args(parts, 2)
+    local cmd, unhandled_index = self:_redirect_to_sub_cmd_by_args(parts, 2)
 
     local result = {}
 
-    vim.list_extend(result, cmd:_complete_subcmd(arg_lead))
+    if unhandled_index == #parts then
+        vim.list_extend(result, cmd:_complete_subcmd(arg_lead))
+    end
 
     vim.list_extend(result, cmd:_complete_flags(arg_lead, cmd_line))
 
