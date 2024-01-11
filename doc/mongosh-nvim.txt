@@ -71,7 +71,9 @@ subcommand provides one actual functionality.
 
         - `with-auth`, a boolean flag, presence of this flag indicates `true`.
         When sets to `true`, plugin will ask user input for authentication
-        user name and password.
+        information, including user name, password, authentication source
+        database. If any of these three is not needed, just leave input box
+        blank and press enter.
 
           You can also provides user name and password via `--username` and
         `--password` flag if you don't mind your password gets recorded in input
@@ -79,7 +81,7 @@ subcommand provides one actual functionality.
 
     Normally speaking, everyone who can reads memory of running program on
     your machine can do many other horrible things to your system, so this
-    plugin assumes storing connection informations in memory to be safe.
+    plugin assumes storing connection information in memory to be safe.
 
     With that being said, this plugin still remaps string connection info with a
     shuffeled ASCII list, texts gets recovered only when they are read, used.
