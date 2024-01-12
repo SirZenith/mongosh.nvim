@@ -31,6 +31,13 @@ M.TEMPLATE_FIND_ONE = [[
 db["${collection}"].findOne({ _id: EJSON.deserialize(${id}) })
 ]]
 
+M.TEMPLATE_FIND_ONE_WITH_DOT_PATH = [[
+db["${collection}"].findOne(
+    { _id: EJSON.deserialize(${id}) },
+    { "${dot_path}": true }
+)
+]]
+
 -- editing template for replaceOne call, user should define following variable
 -- in the snippet provided:
 --
@@ -40,7 +47,16 @@ db["${collection}"].findOne({ _id: EJSON.deserialize(${id}) })
 M.TEMPLATE_EDIT = [[
 ${snippet}
 
-const result = db[collection].replaceOne( { _id: EJSON.deserialize(id) }, replacement)
+const result = db[collection].replaceOne({ _id: EJSON.deserialize(id) }, replacement)
+
+const json = EJSON.stringify(result, null, ${indent})
+print(json)
+]]
+
+M.TEMPLATE_UPDATE_ONE = [[
+${snippet}
+
+const result = db[collection].updateOne({ _id: EJSON.deserialize(id) }, { $set: replacement })
 
 const json = EJSON.stringify(result, null, ${indent})
 print(json)

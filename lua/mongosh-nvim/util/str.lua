@@ -61,7 +61,7 @@ end
 ---@param args table<string, string>
 ---@return string
 function M.format(template, args)
-    local result = template:gsub("${(%w+)}", args)
+    local result = template:gsub("${([%w_]+)}", args)
     return result
 end
 

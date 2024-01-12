@@ -11,6 +11,8 @@ M.BufferType = {
     QueryResult = "query_result",
     Edit = "edit",
     EditResult = "edit_result",
+    Update = "update",
+    UpdateResult = "update_result",
 }
 
 ---@enum mongo.ResultSplitStyle

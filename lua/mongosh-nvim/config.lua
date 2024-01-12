@@ -52,6 +52,16 @@ M = {
                     end
                 end, { buffer = bufnr })
 
+                -- 'build' buffer with visual range
+                vim.keymap.set("v", "<A-b>", function()
+                    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+                    if mbuf then
+                        mbuf:write_result {
+                            with_range = true,
+                        }
+                    end
+                end, { buffer = bufnr })
+
                 -- refresh buffer
                 vim.keymap.set("n", "<A-r>", function()
                     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)

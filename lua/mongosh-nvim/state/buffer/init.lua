@@ -4,6 +4,7 @@ local buffer_const = require "mongosh-nvim.constant.buffer"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
 local log = require "mongosh-nvim.log"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
+local buffer_util = require "mongosh-nvim.util.buffer"
 local str_util = require "mongosh-nvim.util.str"
 local ts_util = require "mongosh-nvim.util.tree_sitter"
 
@@ -13,158 +14,13 @@ local BufferType = buffer_const.BufferType
 local CreateBufferStyle = buffer_const.CreateBufferStyle
 local ResultSplitStyle = buffer_const.ResultSplitStyle
 
+local FALLBACK_BUFFER_TYPE = BufferType.Unknown;
+local FALLBACK_BUFFER_CREATION_STYLE = CreateBufferStyle.OnNeed;
+local FALLBACK_RESULT_SPLIT_STYLE = ResultSplitStyle.Vertical;
+
 local M = {}
 
--- get_win_by_buf finds window that contains target buffer.
----@param bufnr integer
----@param is_in_current_tabpage boolean # when `true`, only looking for window in current tab
----@return integer? winnr
-local function get_win_by_buf(bufnr, is_in_current_tabpage)
-    local wins = is_in_current_tabpage
-        and api.nvim_tabpage_list_wins(0)
-        or api.nvim_list_wins()
-
-    local win
-    for _, w in ipairs(wins) do
-        if api.nvim_win_get_buf(w) == bufnr then
-            win = w
-            break
-        end
-    end
-
-    return win
-end
-
--- read_lines_from_buf returns content of a buffer as list of string.
--- If given buffer is invalide, `nil` will be returned.
----@param bufnr integer
----@return string[]?
-local function read_lines_from_buf(bufnr)
-    if vim.api.nvim_buf_is_valid(bufnr) then return nil end
-
-    local line_cnt = vim.api.nvim_buf_line_count(bufnr)
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, line_cnt, true)
-    return lines
-end
-
--- get_visual_selection returns visual selection range in current buffer.
----@return number? row_st
----@return number? col_st
----@return number? row_ed
----@return number? col_ed
-local function get_visual_selection_range()
-    local unpac = unpack or table.unpack
-    local _, st_r, st_c, _ = unpac(vim.fn.getpos("'<"))
-    local _, ed_r, ed_c, _ = unpac(vim.fn.getpos("'>"))
-    if st_r * st_c * ed_r * ed_c == 0 then return nil end
-    if st_r < ed_r or (st_r == ed_r and st_c <= ed_c) then
-        return st_r - 1, st_c - 1, ed_r - 1, ed_c
-    else
-        return ed_r - 1, ed_c - 1, st_r - 1, st_c
-    end
-end
-
--- get_visual_selection_text returns visual selected text in current buffer.
----@return string[] lines
-local function get_visual_selection_text()
-    local st_r, st_c, ed_r, ed_c = get_visual_selection_range()
-    if not (st_r or st_c or ed_r or ed_c) then return {} end
-
-    local lines = api.nvim_buf_get_text(0, st_r, st_c, ed_r, ed_c, {})
-    return lines
-end
-
 -- ----------------------------------------------------------------------------
-
----@type table<mongo.BufferType, fun(mbuf: mongo.MongoBuffer)>
-local buffer_option_setup_func_map = {
-    -- fallback style
-    [BufferType.Unknown] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-    end,
-    [BufferType.CollectionList] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-
-        -- press <Cr> to select a collection
-        vim.keymap.set("n", "<CR>", function()
-            mbuf:write_result()
-        end, { buffer = bufnr })
-    end,
-    [BufferType.Execute] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-
-        bo.filetype = "typescript"
-    end,
-    [BufferType.Query] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-
-        bo.filetype = "typescript"
-    end,
-    [BufferType.QueryResult] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-
-        bo.filetype = "json"
-    end,
-    [BufferType.Edit] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-
-        bo.filetype = "typescript"
-    end,
-    [BufferType.EditResult] = function(mbuf)
-        local bufnr = mbuf:get_bufnr()
-        if not bufnr then return end
-
-        local bo = vim.bo[bufnr]
-
-        bo.bufhidden = "delete"
-        bo.buflisted = false
-        bo.buftype = "nofile"
-
-        bo.filetype = "json"
-    end,
-}
 
 -- map result buffer creation sytle to buffer maker function
 ---@type table<mongo.CreateBufferStyle, fun(mbuf: mongo.MongoBuffer): integer>
@@ -201,7 +57,7 @@ local result_buffer_getter_map = {
 ---@type table<mongo.ResultSplitStyle, fun(bufnr: integer): integer>
 local result_win_maker_map = {
     [ResultSplitStyle.Horizontal] = function(bufnr)
-        local win = get_win_by_buf(bufnr, true)
+        local win = buffer_util.get_win_by_buf(bufnr, true)
         if not win then
             vim.cmd "botright split"
             win = api.nvim_get_current_win()
@@ -211,7 +67,7 @@ local result_win_maker_map = {
     end,
     -- fallback style
     [ResultSplitStyle.Vertical] = function(bufnr)
-        local win = get_win_by_buf(bufnr, true)
+        local win = buffer_util.get_win_by_buf(bufnr, true)
         if not win then
             vim.cmd "rightbelow vsplit"
             win = api.nvim_get_current_win()
@@ -227,6 +83,8 @@ local result_win_maker_map = {
     end,
 }
 
+-- ----------------------------------------------------------------------------
+
 ---@class mongo.BufferResult
 ---@field type? mongo.BufferType
 ---@field content? string
@@ -234,265 +92,25 @@ local result_win_maker_map = {
 
 ---@alias mongo.ResultGenerator fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(result: mongo.BufferResult))
 
--- map buffer type to result generator functoin, types doesn't get mapped to a
--- generator cannot make result buffer.
----@type table<mongo.BufferType, mongo.ResultGenerator>
-local result_generator_map = {
-    [BufferType.CollectionList] = function(mbuf, args, callback)
-        local collection = args.collection
-        if not collection then
-            local bufnr = mbuf:get_bufnr()
-            local win = bufnr and get_win_by_buf(bufnr, true)
-            local pos = win and api.nvim_win_get_cursor(win)
+---@class mongo.MongoBufferOperationModule
+---@field option_setup? fun(mbuf: mongo.MongoBuffer)
+---@field result_generator? mongo.ResultGenerator
+---@field after_write? fun(src_buf?: mongo.MongoBuffer, result_buf: mongo.MongoBuffer)
+---@field refresh? fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))
 
-            local row = pos and pos[1]
-            local lines = row and api.nvim_buf_get_lines(bufnr, row - 1, row, true)
-
-            collection = lines and lines[1]
-        end
-
-        local content = str_util.format(script_const.SNIPPET_QUERY, {
-            collection = collection,
-        })
-
-        callback {
-            type = BufferType.Query,
-            content = content,
-        }
-    end,
-    [BufferType.Execute] = function(mbuf, args, callback)
-        local lines = args.with_range
-            and mbuf:get_visual_selection()
-            or mbuf:get_lines()
-        local snippet = table.concat(lines, "\n")
-
-        api_core.do_execution(snippet, function(err, result)
-            if err then
-                log.warn(err)
-                callback {}
-                return
-            end
-
-            result = #result > 0 and result or "execution successed"
-
-            callback {
-                type = BufferType.ExecuteResult,
-                content = result,
-                state_args = {
-                    src_script = snippet,
-                }
-            }
-        end)
-    end,
-    [BufferType.Query] = function(mbuf, args, callback)
-        local lines = args.with_range
-            and mbuf:get_visual_selection()
-            or mbuf:get_lines()
-        local query = table.concat(lines, "\n")
-
-        api_core.do_query(query, function(err, response)
-            if err then
-                log.warn(err)
-                callback {}
-                return
-            end
-
-            local collection = ts_util.get_collection_name(query)
-
-            callback {
-                type = BufferType.QueryResult,
-                content = response,
-                state_args = {
-                    query = query,
-                    collection = collection,
-                }
-            }
-        end)
-    end,
-    [BufferType.QueryResult] = function(mbuf, args, callback)
-        local collection = args.collection
-            or mbuf.state_args.collection
-        if collection == nil then
-            log.warn("collection required")
-            callback {}
-            return
-        end
-
-        local bufnr = mbuf:get_bufnr()
-        local id = args.id
-        if not id and bufnr then
-            id = ts_util.find_nearest_id_in_buffer(bufnr)
-        end
-        if id == nil then
-            log.warn("id required")
-            callback {}
-            return
-        end
-
-        local query = str_util.format(script_const.TEMPLATE_FIND_ONE, {
-            collection = collection,
-            id = id,
-        })
-
-        api_core.do_query(query, function(err, result)
-            if err then
-                log.warn(err)
-                callback {}
-                return
-            end
-
-            local snippet = str_util.format(script_const.SNIPPET_EDIT, {
-                collection = collection,
-                id = id,
-                document = result,
-            })
-
-            callback {
-                type = BufferType.Edit,
-                content = snippet,
-                state_args = {
-                    collection = collection,
-                    id = id,
-                },
-            }
-        end, "failed to update document content")
-    end,
-    [BufferType.Edit] = function(mbuf, args, callback)
-        local lines = args.with_range
-            and mbuf:get_visual_selection()
-            or mbuf:get_lines()
-        local snippet = table.concat(lines, "\n")
-
-        api_core.do_replace(snippet, function(err, result)
-            if err then
-                log.warn(err)
-                callback {}
-                return
-            end
-
-            result = #result > 0 and result or "execution successed"
-            callback {
-                type = BufferType.EditResult,
-                content = result,
-                state_args = {
-                    collection = mbuf.state_args.collection,
-                    id = mbuf.state_args.id,
-                },
-            }
-        end)
-    end,
-}
-
--- map buffer type to clean up function which gets called after writing result.
--- If source buffer share the same buffer with result buffer, `src_buf` in function
--- argument will be `nil`.
----@type table<mongo.BufferType, fun(src_buf?: mongo.MongoBuffer, result_buf: mongo.MongoBuffer)>
-local after_write_result_map = {
-    [BufferType.CollectionList] = function(src_buf)
-        local bufnr = src_buf and src_buf:get_bufnr()
-        if not bufnr then return end
-
-        local win = get_win_by_buf(bufnr, true)
-        if not win then return end
-
-        api.nvim_win_hide(win)
-    end
-}
-
--- map buffer type to buffer refreshing function
----@type table<mongo.BufferType, fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))>
-local buffer_refresher_map = {
-    [BufferType.CollectionList] = function(mbuf, callback)
-        local collections = mongosh_state.get_collection_names()
-        if not collections then return end
-
-        mbuf:set_lines(collections)
-        callback()
-    end,
-    [BufferType.ExecuteResult] = function(mbuf, callback)
-        local src_bufnr = mbuf.src_bufnr
-
-        local src_lines = src_bufnr and read_lines_from_buf(src_bufnr)
-        local snippet = src_lines
-            and table.concat(src_lines, "\n")
-            or mbuf.state_args.src_script
-
-        if not snippet or #snippet == 0 then
-            callback("no snippet is binded with current buffer")
-            return
-        end
-
-        api_core.do_execution(snippet, function(err, result)
-            if err then
-                callback(err)
-                return
-            end
-
-            result = #result > 0 and result or "execution successed"
-
-            local lines = vim.split(result, "\n", { plain = true })
-            mbuf:set_lines(lines)
-        end)
-    end,
-    [BufferType.QueryResult] = function(mbuf, callback)
-        local src_bufnr = mbuf.src_bufnr
-
-        local src_lines = src_bufnr and read_lines_from_buf(src_bufnr)
-        local query = src_lines
-            and table.concat(src_lines)
-            or mbuf.state_args.query
-
-        if not query or #query == 0 then
-            callback("no query is binded with current buffer")
-            return
-        end
-
-        api_core.do_query(query, function(err, response)
-            if err then
-                callback(err)
-                return
-            end
-
-            local lines = vim.fn.split(response, "\n")
-            mbuf:set_lines(lines)
-        end)
-    end,
-    [BufferType.Edit] = function(mbuf, callback)
-        local collection = mbuf.state_args.collection
-        if not collection then
-            callback("no collection name is binded with current buffer")
-            return
-        end
-
-        local id = mbuf.state_args.id
-        if not id then
-            callback("no document id is binded with current buffer")
-            return
-        end
-
-        local query = str_util.format(script_const.TEMPLATE_FIND_ONE, {
-            collection = collection,
-            id = id,
-        })
-
-        api_core.do_query(query, function(err, result)
-            if err then
-                callback(err)
-                return
-            end
-
-            local document = str_util.indent(result, config.indent_size)
-
-            local snippet = str_util.format(script_const.SNIPPET_EDIT, {
-                collection = collection,
-                id = id,
-                document = document,
-            })
-
-            local lines = vim.split(snippet, "\n", { plain = true })
-            mbuf:set_lines(lines)
-        end, "failed to update document content")
-    end,
+---@type table<mongo.BufferType, mongo.MongoBufferOperationModule>
+local operation_map = {
+    [BufferType.Unknown] = require "mongosh-nvim.state.buffer.buffer_unknown",
+    [BufferType.DbList] = require "mongosh-nvim.state.buffer.buffer_db_list",
+    [BufferType.CollectionList] = require "mongosh-nvim.state.buffer.buffer_collection_list",
+    [BufferType.Execute] = require "mongosh-nvim.state.buffer.buffer_execute",
+    [BufferType.ExecuteResult] = require "mongosh-nvim.state.buffer.buffer_execute_result",
+    [BufferType.Query] = require "mongosh-nvim.state.buffer.buffer_query",
+    [BufferType.QueryResult] = require "mongosh-nvim.state.buffer.buffer_query_result",
+    [BufferType.Edit] = require "mongosh-nvim.state.buffer.buffer_edit",
+    [BufferType.EditResult] = require "mongosh-nvim.state.buffer.buffer_edit_result",
+    [BufferType.Update] = require "mongosh-nvim.state.buffer.buffer_update",
+    [BufferType.UpdateResult] = require "mongosh-nvim.state.buffer.buffer_update_result",
 }
 
 -- ----------------------------------------------------------------------------
@@ -617,13 +235,15 @@ function MongoBuffer:setup_buf_options()
 
     if self.is_user_buffer then return end
 
-    local setter = buffer_option_setup_func_map[self.type]
+    local module = operation_map[self.type]
+    local setter = module.option_setup
     if not setter then
-        local type = BufferType.Unknown
-        setter = buffer_option_setup_func_map[type]
+        setter = operation_map[FALLBACK_BUFFER_TYPE].option_setup
     end
 
-    setter(self)
+    if setter then
+        setter(self)
+    end
 end
 
 -- destory does clean up on buffer gets unloaded

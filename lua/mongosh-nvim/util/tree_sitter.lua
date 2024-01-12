@@ -78,6 +78,7 @@ end
 -- Take JSON source text and range of target node as input. Find smallest key-
 -- value pair covering given range, and find accessing key path to that key from
 -- root of document.
+-- If covered key itself has no parent key, then `nil` will be returned.
 -- For example, with source text:
 -- ```json
 -- [
@@ -95,6 +96,7 @@ end
 -- access key path `user.foo`
 ---@param json_text string
 ---@param target_range { st_row: number, st_col: number, ed_row: number, ed_col: number } # all index are 0-base, column end is exclusive
+---@return string?
 function M.get_json_node_dot_path(json_text, target_range)
     ---@type LanguageTree
     local parser = ts.get_string_parser(json_text, "json")
@@ -132,9 +134,11 @@ function M.get_json_node_dot_path(json_text, target_range)
         return text
     end)
 
-    local node_path = table.concat(chain, ".")
+    if #chain == 0 then
+        return nil
+    end
 
-    return node_path
+    return table.concat(chain, ".")
 end
 
 return M

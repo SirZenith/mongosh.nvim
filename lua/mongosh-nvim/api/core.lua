@@ -173,7 +173,7 @@ end
 -- ----------------------------------------------------------------------------
 -- Connecting
 
--- Treat every two arguments in input list as flag-value pair, and write them 
+-- Treat every two arguments in input list as flag-value pair, and write them
 -- into stored connection flag map.
 -- Extra flag with no paired value is ignored.
 ---@param args string[]
@@ -297,6 +297,19 @@ function M.do_replace(edit_snippet, callback, fallback_err_msg)
     })
 
     M.do_execution(script_snippet, callback, fallback_err_msg or "replace failed")
+end
+
+-- Fill given update snippet into `updateOne` call template and send it to mongosh.
+---@param update_snippet string
+---@param callback fun(err: string?, result: string)
+---@param fallback_err_msg? string
+function M.do_update_one(update_snippet, callback, fallback_err_msg)
+    local script_snippet = str_util.format(script_const.TEMPLATE_UPDATE_ONE, {
+        snippet = update_snippet,
+        indent = tostring(config.indent_size),
+    })
+
+    M.do_execution(script_snippet, callback, fallback_err_msg or "update one failed")
 end
 
 -- ----------------------------------------------------------------------------
