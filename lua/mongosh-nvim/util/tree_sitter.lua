@@ -1,4 +1,5 @@
 local ts_const = require "mongosh-nvim.constant.tree_sitter"
+local list_util = require "mongosh-nvim.util.list"
 
 local ts = vim.treesitter
 
@@ -39,10 +40,10 @@ function M.get_collection_name(src)
         local prefix = txt:sub(1, 3)
 
         if prefix == "db[" then
-            txt = txt:sub(5) -- trim leading 'db[' (and quote)
+            txt = txt:sub(5)           -- trim leading 'db[' (and quote)
             txt = txt:sub(1, #txt - 2) -- trim trailing '"]' or "']"
         elseif prefix == "db." then
-            txt = txt:sub(4) -- trim leading 'db.'
+            txt = txt:sub(4)           -- trim leading 'db.'
         end
 
         result = txt
@@ -72,6 +73,68 @@ function M.find_nearest_id_in_buffer(bufid)
             return node_text
         end
     end
+end
+
+-- Take JSON source text and range of target node as input. Find smallest key-
+-- value pair covering given range, and find accessing key path to that key from
+-- root of document.
+-- For example, with source text:
+-- ```json
+-- [
+--     {
+--         "user": {
+--             "foo": {
+--                 "bar": "buz"
+--             }
+--         }
+--     }
+-- ]
+-- ```
+-- and seelction range covers `ar": "buz"`.
+-- This function will first find key value pair `"foo": { ... }`, and returns
+-- access key path `user.foo`
+---@param json_text string
+---@param target_range { st_row: number, st_col: number, ed_row: number, ed_col: number } # all index are 0-base, column end is exclusive
+function M.get_json_node_dot_path(json_text, target_range)
+    ---@type LanguageTree
+    local parser = ts.get_string_parser(json_text, "json")
+    local tree = parser:parse()[1]
+    local root = tree:root()
+
+    local cur_node = root:descendant_for_range(
+        target_range.st_row,
+        target_range.st_col,
+        target_range.ed_row,
+        target_range.ed_col
+    )
+
+    local chain = {} ---@type TSNode[]
+    repeat
+        table.insert(chain, cur_node)
+        cur_node = cur_node:parent()
+    until not cur_node
+
+    list_util.list_reverse(chain)
+    list_util.list_filter_in_place(chain, function(_, node)
+        return node:type() == "pair"
+    end)
+    list_util.list_map_in_place(chain, function(_, node)
+        local key_node = node:field("key")[1]
+        local key_type = key_node:type()
+
+        local target = key_node
+        if key_type == "string" then
+            target = key_node:named_child(0)
+        end
+
+        local text = ts.get_node_text(target, json_text)
+
+        return text
+    end)
+
+    local node_path = table.concat(chain, ".")
+
+    return node_path
 end
 
 return M
