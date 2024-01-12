@@ -98,6 +98,7 @@ M = {
         ---@type integer
         padding = 4,
 
+        -- symbol for indication different types of list elemnt.
         symbol = {
             loading = {
                 collection = " ",

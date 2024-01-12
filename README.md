@@ -1,7 +1,5 @@
 # mongosh.nvim
 
-This plugin is inspired by [jrop/mongo.nvim](https://github.com/jrop/mongo.nvim).
-
 <b>Notice</b>: still in early stage of development, might be breaking change.
 
 ---
@@ -55,6 +53,10 @@ Check out `:help mongosh-nvim` for documentation.
 Basically, this plugin provides command `:Mongo` as entrance, and several
 subcommands that actually do something.
 
-Overview video:
+Screen shot (click to jump to video):
 
-[![usage overview](https://i.ytimg.com/vi/lnBtr-dtoAk/maxresdefault.jpg)](https://www.youtube.com/watch?v=lnBtr-dtoAk)
+[![screen shot](./img/screen_shot.png)](https://youtu.be/t8gPMM5TuyI)
+
+## Thanks
+
+This plugin is inspired by [jrop/mongo.nvim](https://github.com/jrop/mongo.nvim).
