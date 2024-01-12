@@ -56,9 +56,7 @@ M.SNIPPET_EDIT = [[
 // Edit document value here
 const collection = "${collection}"
 const id = ${id}
-const replacement = EJSON.deserialize(
-${document}
-)
+const replacement = EJSON.deserialize(${document})
 ]]
 
 return M

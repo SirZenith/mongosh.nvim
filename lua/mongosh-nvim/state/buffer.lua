@@ -341,13 +341,10 @@ local result_generator_map = {
                 return
             end
 
-            local document = str_util.indent(result, config.indent_size)
-            -- document = document:sub(4) -- remove indent at the beginning
-
             local snippet = str_util.format(script_const.SNIPPET_EDIT, {
                 collection = collection,
                 id = id,
-                document = document,
+                document = result,
             })
 
             callback {
