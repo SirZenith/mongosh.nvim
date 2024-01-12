@@ -12,6 +12,8 @@ in current connection.
 
   By pressing enter on a list entry, one can expand a database entry to show all
 collections in it, or create a new qery buffer on a collection.
+- Allow user specifying result buffer creation style and window splitting style
+for individual buffer type.
 
 ### Changed
 
