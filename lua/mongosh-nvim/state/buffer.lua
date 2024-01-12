@@ -587,9 +587,14 @@ end
 
 -- init_style initialize result managing style for this buffer object.
 function MongoBuffer:init_style()
-    self.create_win_style = config.result_buffer.split_style
+    local result_config = config.result_buffer
+    local type = self.type
 
-    self.create_buffer_style = config.result_buffer.create_buffer_style
+    self.create_win_style = result_config.split_style_type_map[type] or result_config.split_style
+
+    self.create_buffer_style = result_config.create_buffer_style_type_map[type] or result_config.create_buffer_style
+
+    -- Do not overwrite content of non-sketch buffer by default.
     if self.is_user_buffer
         and self.create_buffer_style == CreateBufferStyle.Never
     then
@@ -683,6 +688,9 @@ end
 ---@param type mongo.BufferType
 function MongoBuffer:change_type_to(type)
     self.type = type
+
+    self:init_style()
+    self:setup_buf_options()
 end
 
 -- get_lines returns content of current buffer in an array of text lines.
@@ -826,7 +834,7 @@ function MongoBuffer:write_result(args)
 
         -- update steate
 
-        buf_obj.type = result.type
+        buf_obj:change_type_to(result.type)
 
         local content = result.content
         local lines = content
@@ -835,8 +843,6 @@ function MongoBuffer:write_result(args)
         buf_obj:set_lines(lines)
 
         buf_obj.state_args = result.state_args
-
-        buf_obj:setup_buf_options()
 
         self.result_bufnr = no_buf_reuse and new_buf or nil
 

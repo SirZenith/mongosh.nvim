@@ -69,10 +69,24 @@ M = {
         ---@type mongo.ResultSplitStyle
         split_style = ResultSplitStyle.Vertical,
 
+        -- Type-wise result window split style setting. Mongo buffers prefers
+        -- using value in this map to do initialization if style for its type is
+        -- found here.
+        ---@type table<mongo.ResultSplitStyle, mongo.ResultSplitStyle>
+        split_style_type_map = {
+            [BufferType.QueryResult] = ResultSplitStyle.Tab,
+        },
+
         -- When this plugin should create a new result buffer.
         -- This will be default value for new buffer.
         ---@type mongo.CreateBufferStyle
         create_buffer_style = CreateBufferStyle.OnNeed,
+
+        -- Type-wise result buffer creation strategy. Mongo bufferrs prefers
+        -- using value in this map to do initialization if style for its type is
+        -- found here
+        ---@type table<mongo.BufferType, mongo.CreateBufferStyle>
+        create_buffer_style_type_map = {},
     },
 
     sidebar = {
