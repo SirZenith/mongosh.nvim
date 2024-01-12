@@ -55,7 +55,10 @@ function M.result_generator(mbuf, args, callback)
         query = str_util.format(script_const.TEMPLATE_FIND_ONE_WITH_DOT_PATH, {
             collection = collection,
             id = id,
-            dot_path = dot_path,
+            filter = vim.json.encode {
+                [dot_path] = true,
+                _id = false,
+            },
         })
 
         buffer_type = BufferType.Update
@@ -87,6 +90,7 @@ function M.result_generator(mbuf, args, callback)
             state_args = {
                 collection = collection,
                 id = id,
+                dot_path = dot_path,
             },
         }
     end, "failed to update document content")

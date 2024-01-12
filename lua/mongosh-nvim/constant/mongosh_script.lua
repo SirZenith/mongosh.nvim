@@ -34,7 +34,7 @@ db["${collection}"].findOne({ _id: EJSON.deserialize(${id}) })
 M.TEMPLATE_FIND_ONE_WITH_DOT_PATH = [[
 db["${collection}"].findOne(
     { _id: EJSON.deserialize(${id}) },
-    { "${dot_path}": true }
+    ${filter}
 )
 ]]
 
