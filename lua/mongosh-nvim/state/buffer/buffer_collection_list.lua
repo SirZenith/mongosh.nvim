@@ -1,23 +1,17 @@
-local api_core = require "mongosh-nvim.api.core"
-local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
-local log = require "mongosh-nvim.log"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
-local buffer_util = require "mongosh-nvim.state.buffer"
+local buffer_util = require "mongosh-nvim.util.buffer"
 local str_util = require "mongosh-nvim.util.str"
-local ts_util = require "mongosh-nvim.util.tree_sitter"
 
 local api = vim.api
 
 local BufferType = buffer_const.BufferType
-local CreateBufferStyle = buffer_const.CreateBufferStyle
-local ResultSplitStyle = buffer_const.ResultSplitStyle
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
-function M.option_setup(mbuf)
+function M.option_setter(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -56,7 +50,7 @@ function M.result_generator(mbuf, args, callback)
     }
 end
 
-function M.after_write(src_buf)
+function M.after_write_handler(_, src_buf, _)
     local bufnr = src_buf and src_buf:get_bufnr()
     if not bufnr then return end
 
@@ -66,12 +60,12 @@ function M.after_write(src_buf)
     api.nvim_win_hide(win)
 end
 
-function M.refresh(mbuf, callback)
-        local collections = mongosh_state.get_collection_names()
-        if not collections then return end
+function M.refresher(mbuf, callback)
+    local collections = mongosh_state.get_collection_names()
+    if not collections then return end
 
-        mbuf:set_lines(collections)
-        callback()
-    end
+    mbuf:set_lines(collections)
+    callback()
+end
 
 return M

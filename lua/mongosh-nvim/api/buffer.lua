@@ -78,7 +78,7 @@ function M.run_buffer_executation(bufnr, args)
         [BufferType.Edit] = true,
     }
 
-    if supported_types[mbuf.type] then
+    if supported_types[mbuf:get_type()] then
         mbuf:change_type_to(BufferType.Execute)
         mbuf:write_result(args)
     else
@@ -104,7 +104,8 @@ function M.run_buffer_query(bufnr, args)
     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
         or buffer_state.wrap_with_mongo_buffer(BufferType.Query, bufnr)
 
-    if mbuf.type == BufferType.Execute then
+    local type = mbuf:get_type()
+    if type == BufferType.Execute then
         mbuf:change_type_to(BufferType.Query)
     end
 
@@ -112,7 +113,7 @@ function M.run_buffer_query(bufnr, args)
         [BufferType.Query] = true,
     }
 
-    if supported_types[mbuf.type] then
+    if supported_types[type] then
         mbuf:write_result(args)
     else
         log.warn("current buffer doesn't support Query command")
@@ -143,7 +144,8 @@ function M.run_buffer_edit(bufnr, args)
     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
         or buffer_state.wrap_with_mongo_buffer(BufferType.Edit, bufnr)
 
-    if mbuf.type == BufferType.Execute then
+    local type = mbuf:get_type()
+    if type == BufferType.Execute then
         mbuf:change_type_to(BufferType.Edit)
     end
 
@@ -152,7 +154,7 @@ function M.run_buffer_edit(bufnr, args)
         [BufferType.Edit] = true,
     }
 
-    if supported_types[mbuf.type] then
+    if supported_types[type] then
         mbuf:write_result(args)
     else
         log.warn("current buffer doesn't support Edit command")

@@ -3,20 +3,14 @@ local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
 local log = require "mongosh-nvim.log"
-local mongosh_state = require "mongosh-nvim.state.mongosh"
 local str_util = require "mongosh-nvim.util.str"
-local ts_util = require "mongosh-nvim.util.tree_sitter"
-
-local api = vim.api
 
 local BufferType = buffer_const.BufferType
-local CreateBufferStyle = buffer_const.CreateBufferStyle
-local ResultSplitStyle = buffer_const.ResultSplitStyle
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
-function M.option_setup(mbuf)
+function M.option_setter(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -47,21 +41,21 @@ function M.result_generator(mbuf, args, callback)
             type = BufferType.EditResult,
             content = result,
             state_args = {
-                collection = mbuf.state_args.collection,
-                id = mbuf.state_args.id,
+                collection = mbuf._state_args.collection,
+                id = mbuf._state_args.id,
             },
         }
     end)
 end
 
-function M.refresh(mbuf, callback)
-    local collection = mbuf.state_args.collection
+function M.refresher(mbuf, callback)
+    local collection = mbuf._state_args.collection
     if not collection then
         callback("no collection name is binded with current buffer")
         return
     end
 
-    local id = mbuf.state_args.id
+    local id = mbuf._state_args.id
     if not id then
         callback("no document id is binded with current buffer")
         return
@@ -78,16 +72,16 @@ function M.refresh(mbuf, callback)
             return
         end
 
-        local document = str_util.indent(result, config.indent_size)
-
         local snippet = str_util.format(script_const.SNIPPET_EDIT, {
             collection = collection,
             id = id,
-            document = document,
+            document = result,
         })
 
         local lines = vim.split(snippet, "\n", { plain = true })
         mbuf:set_lines(lines)
+
+        callback()
     end, "failed to update document content")
 end
 

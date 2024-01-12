@@ -1,12 +1,7 @@
-local api_core = require "mongosh-nvim.api.core"
 local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
-local script_const = require "mongosh-nvim.constant.mongosh_script"
 local log = require "mongosh-nvim.log"
-local mongosh_state = require "mongosh-nvim.state.mongosh"
 local buffer_util = require "mongosh-nvim.util.buffer"
-local str_util = require "mongosh-nvim.util.str"
-local ts_util = require "mongosh-nvim.util.tree_sitter"
 
 local api = vim.api
 
@@ -31,9 +26,8 @@ local result_buffer_getter_map = {
         return buf
     end,
     -- Only create new buffer when no old result buffer exists.
-    -- fallback style
     [CreateBufferStyle.OnNeed] = function(mbuf)
-        local buf = mbuf.result_bufnr
+        local buf = mbuf._result_bufnr
         if not buf
             or not api.nvim_buf_is_valid(buf)
         then
@@ -65,7 +59,6 @@ local result_win_maker_map = {
 
         return win
     end,
-    -- fallback style
     [ResultSplitStyle.Vertical] = function(bufnr)
         local win = buffer_util.get_win_by_buf(bufnr, true)
         if not win then
@@ -93,13 +86,13 @@ local result_win_maker_map = {
 ---@alias mongo.ResultGenerator fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(result: mongo.BufferResult))
 
 ---@class mongo.MongoBufferOperationModule
----@field option_setup? fun(mbuf: mongo.MongoBuffer)
+---@field option_setter? fun(mbuf: mongo.MongoBuffer)
 ---@field result_generator? mongo.ResultGenerator
----@field after_write? fun(src_buf?: mongo.MongoBuffer, result_buf: mongo.MongoBuffer)
----@field refresh? fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))
+---@field after_write_handler? fun(mbuf: mongo.MongoBuffer, src_buf?: mongo.MongoBuffer, result_buf: mongo.MongoBuffer)
+---@field refresher? fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))
 
 ---@type table<mongo.BufferType, mongo.MongoBufferOperationModule>
-local operation_map = {
+local OPERATION_MAP = {
     [BufferType.Unknown] = require "mongosh-nvim.state.buffer.buffer_unknown",
     [BufferType.DbList] = require "mongosh-nvim.state.buffer.buffer_db_list",
     [BufferType.CollectionList] = require "mongosh-nvim.state.buffer.buffer_collection_list",
@@ -113,26 +106,38 @@ local operation_map = {
     [BufferType.UpdateResult] = require "mongosh-nvim.state.buffer.buffer_update_result",
 }
 
+local FALLBACK_OP_MODEL = OPERATION_MAP[FALLBACK_BUFFER_TYPE]
+
 -- ----------------------------------------------------------------------------
 
----@class mongo.MongoBuffer
+---@class mongo.MongoBuffer : mongo.MongoBufferOperationModule
 --
----@field type mongo.BufferType
----@field is_user_buffer boolean # Whether this buffer is created by user
+---@field _type mongo.BufferType
+---@field _is_user_buffer boolean # Whether this buffer is created by user
 --
----@field bufnr integer # buffer number of this buffer.
----@field dummy_lines? string[] # for dummy buffer, this will be its content.
----@field is_destroied boolean
+---@field _bufnr integer # buffer number of this buffer.
+---@field _dummy_lines? string[] # for dummy buffer, this will be its content.
+---@field _is_destroied boolean
 --
----@field src_bufnr? integer # source buffer that create this buffer.
----@field result_bufnr? integer # result buffer used to display executation result of this buffer.
----@field state_args table<string, any> # state values bind with this buffer.
+---@field _src_bufnr? integer # source buffer that create this buffer.
+---@field _result_bufnr? integer # result buffer used to display executation result of this buffer.
+---@field _state_args table<string, any> # state values bind with this buffer.
 --
----@field create_buffer_style mongo.CreateBufferStyle #
+---@field create_buffer_style mongo.CreateBufferStyle
 ---@field create_win_style mongo.ResultSplitStyle
 local MongoBuffer = {}
-MongoBuffer.__index = MongoBuffer
 MongoBuffer._instance_map = {}
+
+function MongoBuffer:__index(key)
+    local value = rawget(self, key) or getmetatable(self)[key]
+    if value ~= nil then return value end
+
+    local type = rawget(self, "_type")
+    local module = type and OPERATION_MAP[type]
+    value = module and module[key] or FALLBACK_OP_MODEL[key]
+
+    return value
+end
 
 -- get_buffer_obj returns buffer object of given buffer if that buffer is created
 -- by this plugin, otherwise `nil` is returned.
@@ -159,11 +164,11 @@ function MongoBuffer:new(type, src_bufnr, result_bufnr, bufnr)
 
     self._instance_map[bufnr] = obj
 
-    obj.bufnr = bufnr
-    obj.type = type
-    obj.src_bufnr = src_bufnr
-    obj.result_bufnr = result_bufnr
-    obj.state_args = {}
+    obj._bufnr = bufnr
+    obj._type = type
+    obj._src_bufnr = src_bufnr
+    obj._result_bufnr = result_bufnr
+    obj._state_args = {}
 
     obj:init_style()
     obj:init_autocmd()
@@ -187,13 +192,13 @@ end
 function MongoBuffer:new_dummy(type, lines)
     local obj = setmetatable({}, self)
 
-    obj.is_user_buffer = false
+    obj._is_user_buffer = false
 
-    obj.bufnr = 0
-    obj.dummy_lines = vim.deepcopy(lines)
+    obj._bufnr = 0
+    obj._dummy_lines = vim.deepcopy(lines)
 
-    obj.type = type
-    obj.state_args = {}
+    obj._type = type
+    obj._state_args = {}
 
     obj:init_style()
 
@@ -203,14 +208,14 @@ end
 -- init_style initialize result managing style for this buffer object.
 function MongoBuffer:init_style()
     local result_config = config.result_buffer
-    local type = self.type
+    local type = self._type
 
-    self.create_win_style = result_config.split_style_type_map[type] or result_config.split_style
+    self.create_win_style = result_config.split_style_type_map[type] or FALLBACK_RESULT_SPLIT_STYLE
 
-    self.create_buffer_style = result_config.create_buffer_style_type_map[type] or result_config.create_buffer_style
+    self.create_buffer_style = result_config.create_buffer_style_type_map[type] or FALLBACK_BUFFER_CREATION_STYLE
 
     -- Do not overwrite content of non-sketch buffer by default.
-    if self.is_user_buffer
+    if self._is_user_buffer
         and self.create_buffer_style == CreateBufferStyle.Never
     then
         self.create_buffer_style = CreateBufferStyle.OnNeed
@@ -233,17 +238,9 @@ end
 function MongoBuffer:setup_buf_options()
     if not self:get_bufnr() then return end
 
-    if self.is_user_buffer then return end
+    if self._is_user_buffer then return end
 
-    local module = operation_map[self.type]
-    local setter = module.option_setup
-    if not setter then
-        setter = operation_map[FALLBACK_BUFFER_TYPE].option_setup
-    end
-
-    if setter then
-        setter(self)
-    end
+    self:option_setter()
 end
 
 -- destory does clean up on buffer gets unloaded
@@ -252,13 +249,13 @@ function MongoBuffer:destory()
     if not bufnr then return end
 
     self._instance_map[bufnr] = nil
-    self.is_destroied = true
+    self._is_destroied = true
 end
 
 -- is_valid returns `true` if a buffer is not discarded yet.
 ---@return boolean
 function MongoBuffer:is_valid()
-    if self.is_destroied then
+    if self._is_destroied then
         return false
     end
 
@@ -266,7 +263,7 @@ function MongoBuffer:is_valid()
     if bufnr then
         return vim.api.nvim_buf_is_valid(bufnr)
     else
-        return self.dummy_lines ~= nil
+        return self._dummy_lines ~= nil
     end
 end
 
@@ -274,7 +271,7 @@ end
 -- Returns `nil` if this object is a dummy mongo buffer.
 ---@return integer? bufnr
 function MongoBuffer:get_bufnr()
-    return self.bufnr > 0 and self.bufnr or nil
+    return self._bufnr > 0 and self._bufnr or nil
 end
 
 ---@param win? integer # if not `nil`, buffer will be displayed in given window.
@@ -282,7 +279,7 @@ function MongoBuffer:show(win)
     local bufnr = self:get_bufnr()
     if not bufnr then return end
 
-    win = win or get_win_by_buf(bufnr, true)
+    win = win or buffer_util.get_win_by_buf(bufnr, true)
     if win then return end
 
     local cmd = "vsplit"
@@ -301,10 +298,15 @@ function MongoBuffer:show(win)
     api.nvim_win_set_buf(win, bufnr)
 end
 
+-- Return buffer type of this object.
+function MongoBuffer:get_type()
+    return self._type
+end
+
 -- change_type_to switches buffer type to given `type`.
 ---@param type mongo.BufferType
 function MongoBuffer:change_type_to(type)
-    self.type = type
+    self._type = type
 
     self:init_style()
     self:setup_buf_options()
@@ -318,8 +320,8 @@ function MongoBuffer:get_lines()
     local lines
     if bufnr then
         lines = vim.api.nvim_buf_get_lines(bufnr, 0, vim.api.nvim_buf_line_count(bufnr), true)
-    elseif self.dummy_lines then
-        lines = vim.deepcopy(self.dummy_lines) --[=[@as string[]]=]
+    elseif self._dummy_lines then
+        lines = vim.deepcopy(self._dummy_lines) --[=[@as string[]]=]
     else
         lines = {}
     end
@@ -335,7 +337,7 @@ function MongoBuffer:set_lines(lines)
     if bufnr then
         api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
     else
-        self.dummy_lines = vim.deepcopy(lines)
+        self._dummy_lines = vim.deepcopy(lines)
     end
 end
 
@@ -348,7 +350,7 @@ function MongoBuffer:get_visual_selection()
     local cur_bufnr = api.nvim_win_get_buf(0)
     if bufnr ~= cur_bufnr then return {} end
 
-    return get_visual_selection_text()
+    return buffer_util.get_visual_selection_text()
 end
 
 -- make_result_buffer returns buffer number of the buffer which write result to according to buffer
@@ -397,40 +399,23 @@ function MongoBuffer:make_result_buffer_obj(win)
 
     local cur_buf = self:get_bufnr()
 
-    -- it's possible buf_obj here is `self`, make sure following setup override
-    -- all necessary field in buf_obj
-    local buf_obj = self.get_buffer_obj(buf)
-    if not buf_obj then
-        buf_obj = MongoBuffer:new(BufferType.Unknown, nil, nil, buf)
-        buf_obj.is_user_buffer = buf == cur_buf and self.is_user_buffer
-    end
-
-    buf_obj.src_bufnr = buf ~= cur_buf and cur_buf or nil
-    buf_obj.result_bufnr = nil
+    local buf_obj = MongoBuffer:new(
+        FALLBACK_BUFFER_TYPE,
+        buf ~= cur_buf and cur_buf or nil,
+        nil,
+        buf
+    )
+    buf_obj._is_user_buffer = buf == cur_buf and self._is_user_buffer
 
     return nil, buf_obj
 end
 
--- get_result_generator rerturns result generation function for current buffer.
--- If `nil` is returned, then current buffer is not capabale of generating result.
----@return mongo.ResultGenerator?
-function MongoBuffer:get_result_generator()
-    local type = self.type
-    return result_generator_map[type]
-end
-
--- write_result trys to make buffer and window and write result to them.
+-- Try to make buffer and window, then write result to result buffer.
 ---@param args? table<string, any>
 function MongoBuffer:write_result(args)
     args = args or {}
 
-    local result_gen = self:get_result_generator()
-    if not result_gen then
-        log.error("not resul generator found for buffer type: " .. self.type)
-        return
-    end
-
-    result_gen(self, args, function(result)
+    self:result_generator(args, function(result)
         if not result.type then
             log.warn("failed to generate result")
             return
@@ -447,7 +432,6 @@ function MongoBuffer:write_result(args)
 
         local new_buf = buf_obj:get_bufnr()
         local no_buf_reuse = new_buf ~= self:get_bufnr()
-        local src_buf_type = self.type
 
         -- update steate
 
@@ -459,29 +443,20 @@ function MongoBuffer:write_result(args)
             or {}
         buf_obj:set_lines(lines)
 
-        buf_obj.state_args = result.state_args
+        buf_obj._state_args = result.state_args
 
-        self.result_bufnr = no_buf_reuse and new_buf or nil
+        self._result_bufnr = no_buf_reuse and new_buf or nil
 
         -- after write clean up
 
-        local after_write = after_write_result_map[src_buf_type]
-        if after_write then
-            local src_buf = no_buf_reuse and self or nil
-            after_write(src_buf, buf_obj)
-        end
+        local src_buf = no_buf_reuse and self or nil
+        self:after_write_handler(src_buf, buf_obj)
     end)
 end
 
 -- refresh tries to regenerate buffer content.
 function MongoBuffer:refresh()
-    local refresher = buffer_refresher_map[self.type]
-    if not refresher then
-        log.warn("current buffer doesn't support refreshing")
-        return
-    end
-
-    refresher(self, function(err)
+    self:refresher(function(err)
         if err then
             log.warn(err)
         else
