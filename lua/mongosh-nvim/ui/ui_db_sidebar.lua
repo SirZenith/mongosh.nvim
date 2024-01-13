@@ -443,6 +443,8 @@ function UIDBSidebar:on_select_database(item)
 
     local names = api_core.get_collection_names(item.name)
     if names then
+        api_core.switch_to_db(item.name)
+
         item.collections = names
         self:write_to_buffer()
         return
