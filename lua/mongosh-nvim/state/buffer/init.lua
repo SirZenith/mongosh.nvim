@@ -76,19 +76,27 @@ local result_win_maker_map = {
     end,
 }
 
+-- Return result window number according to split style.
+---@param split_style mongo.ResultSplitStyle
+---@param bufnr integer
+local function make_result_win(split_style, bufnr)
+    local maker = result_win_maker_map[split_style] or result_win_maker_map[FALLBACK_RESULT_SPLIT_STYLE]
+    local win = maker(bufnr)
+    return win
+end
+
 -- ----------------------------------------------------------------------------
 
----@class mongo.BufferResult
----@field type? mongo.BufferType
----@field content? string
+---@class mongo.BufferResultArgs
+---@field type mongo.BufferType
 ---@field state_args? table<string, any>
 
----@alias mongo.ResultGenerator fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(result: mongo.BufferResult))
-
 ---@class mongo.MongoBufferOperationModule
+---@field content_writer? fun(mbuf: mongo.MongoBuffer, callback: fun(err: string?))
 ---@field option_setter? fun(mbuf: mongo.MongoBuffer)
----@field result_generator? mongo.ResultGenerator
----@field after_write_handler? fun(mbuf: mongo.MongoBuffer, src_buf?: mongo.MongoBuffer, result_buf: mongo.MongoBuffer)
+---@field result_args_generator? fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(err: string?, args: mongo.BufferResultArgs?))
+---@field on_result_failed? fun(mbuf: mongo.MongoBuffer, err: string)
+---@field on_result_successed? fun(mbuf: mongo.MongoBuffer, result_obj: mongo.MongoBuffer)
 ---@field refresher? fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))
 
 ---@type table<mongo.BufferType, mongo.MongoBufferOperationModule>
@@ -274,26 +282,18 @@ function MongoBuffer:get_bufnr()
     return self._bufnr > 0 and self._bufnr or nil
 end
 
+---@param split_style? mongo.ResultSplitStyle
 ---@param win? integer # if not `nil`, buffer will be displayed in given window.
-function MongoBuffer:show(win)
+function MongoBuffer:show(split_style, win)
     local bufnr = self:get_bufnr()
     if not bufnr then return end
 
-    win = win or buffer_util.get_win_by_buf(bufnr, true)
-    if win then return end
+    split_style = split_style or config.dialog.split_style
 
-    local cmd = "vsplit"
-    local style = config.dialog.split_style
-    if style == ResultSplitStyle.Horizontal then
-        cmd = "botright split"
-    elseif style == ResultSplitStyle.Vertical then
-        cmd = "rightbelow vsplit"
-    elseif style == ResultSplitStyle.Tab then
-        cmd = "tabnew"
+    win = win or make_result_win(split_style, bufnr)
+    if win <= 0 then
+        return "failed to get window for result buffer", nil
     end
-
-    vim.cmd(cmd)
-    win = api.nvim_get_current_win()
 
     api.nvim_win_set_buf(win, bufnr)
 end
@@ -331,14 +331,26 @@ end
 
 -- set_lines writes given lines to current buffer, overwriting existing content
 -- in buffer.
----@param lines string[]
+---@param lines string | string[]
 function MongoBuffer:set_lines(lines)
+    if type(lines) == "string" then
+        lines = vim.split(lines, "\n", { plain = true })
+    end
+
     local bufnr = self:get_bufnr()
     if bufnr then
         api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
     else
         self._dummy_lines = vim.deepcopy(lines)
     end
+end
+
+-- Tries to get lines from source buffer.
+---@return string[]?
+function MongoBuffer:get_src_buf_lines()
+    local src_bufnr = self._src_bufnr
+    local src_lines = src_bufnr and buffer_util.read_lines_from_buf(src_bufnr)
+    return src_lines
 end
 
 -- get_visual_selection returns visual selected text in current buffer.
@@ -351,6 +363,12 @@ function MongoBuffer:get_visual_selection()
     if bufnr ~= cur_bufnr then return {} end
 
     return buffer_util.get_visual_selection_text()
+end
+
+-- Set buffer state argument to reference a table.
+---@param state_args table<string, any>
+function MongoBuffer:set_state_args(state_args)
+    self._state_args = state_args
 end
 
 -- make_result_buffer returns buffer number of the buffer which write result to according to buffer
@@ -367,44 +385,20 @@ function MongoBuffer:make_result_buffer()
     return buf
 end
 
--- make_result_win returns window number to
-function MongoBuffer:make_result_win(bufnr)
-    local maker = result_win_maker_map[self.create_win_style]
-    if not maker then
-        local style = ResultSplitStyle.Vertical
-        maker = result_win_maker_map[style]
-    end
-
-    local win = maker(bufnr)
-
-    return win
-end
-
 -- make_result_buffer_obj creates a mongo buffer object for writing result.
----@param win? integer # if not `nil`, buffer will be displayed in given window.
+---@param type mongo.BufferType
 ---@return string? err
 ---@return mongo.MongoBuffer?
-function MongoBuffer:make_result_buffer_obj(win)
+function MongoBuffer:make_result_buffer_obj(type)
     local buf = self:make_result_buffer()
     if buf <= 0 then
         return "failed to create new buffer", nil
     end
 
-    win = win or self:make_result_win(buf)
-    if win <= 0 then
-        return "failed to get window for result buffer", nil
-    end
-
-    api.nvim_win_set_buf(win, buf)
-
     local cur_buf = self:get_bufnr()
+    local src_buf = buf ~= cur_buf and cur_buf or nil
 
-    local buf_obj = MongoBuffer:new(
-        FALLBACK_BUFFER_TYPE,
-        buf ~= cur_buf and cur_buf or nil,
-        nil,
-        buf
-    )
+    local buf_obj = MongoBuffer:new(type, src_buf, nil, buf)
     buf_obj._is_user_buffer = buf == cur_buf and self._is_user_buffer
 
     return nil, buf_obj
@@ -414,43 +408,33 @@ end
 ---@param args? table<string, any>
 function MongoBuffer:write_result(args)
     args = args or {}
+    local target_win = args.win
 
-    self:result_generator(args, function(result)
-        if not result.type then
-            log.warn("failed to generate result")
+    self:result_args_generator(args, function(result_err, result_args)
+        if result_err or not result_args then
+            log.warn(result_err or "failed to genrate arguments for writing result")
             return
         end
 
-        local err, buf_obj = self:make_result_buffer_obj(args.win)
-        if err then
-            log.warn(err)
-            return
-        elseif not buf_obj then
-            log.warn("failed to create result buffer object")
+        local buf_err, buf_obj = self:make_result_buffer_obj(result_args.type)
+        if buf_err or not buf_obj then
+            log.warn(buf_err or "faled to create result buffer object")
             return
         end
 
-        local new_buf = buf_obj:get_bufnr()
-        local no_buf_reuse = new_buf ~= self:get_bufnr()
+        local result_buf = buf_obj:get_bufnr()
+        local src_buf = self:get_bufnr()
+        self._result_bufnr = result_buf ~= src_buf and result_buf or nil
 
-        -- update steate
-
-        buf_obj:change_type_to(result.type)
-
-        local content = result.content
-        local lines = content
-            and vim.split(content, "\n", { plain = true })
-            or {}
-        buf_obj:set_lines(lines)
-
-        buf_obj._state_args = result.state_args
-
-        self._result_bufnr = no_buf_reuse and new_buf or nil
-
-        -- after write clean up
-
-        local src_buf = no_buf_reuse and self or nil
-        self:after_write_handler(src_buf, buf_obj)
+        buf_obj._state_args = result_args.state_args
+        buf_obj:content_writer(function(err)
+            if err then
+                self:on_result_failed(err)
+            else
+                buf_obj:show(self.create_win_style, target_win)
+                self:on_result_successed(buf_obj)
+            end
+        end)
     end)
 end
 
@@ -467,21 +451,19 @@ end
 
 -- ----------------------------------------------------------------------------
 
--- create_mongo_buffer makes a new mongo buffer and show it on screen
+-- Make a new mongo buffer without showing it on screen.
 ---@param type mongo.BufferType
 ---@param lines string[]
----@param win? integer # if not `nil`, buffer will be displayed in given window.
 ---@return mongo.MongoBuffer
-function M.create_mongo_buffer(type, lines, win)
+function M.create_mongo_buffer(type, lines)
     local mbuf = MongoBuffer:new(type)
 
     mbuf:set_lines(lines)
-    mbuf:show(win)
 
     return mbuf
 end
 
--- create_dummy_mongo_buffer makes a new dummy mongo buffer with given content.
+-- Make a new dummy mongo buffer with given content.
 ---@param type mongo.BufferType
 ---@param lines string[]
 ---@return mongo.MongoBuffer
@@ -489,7 +471,7 @@ function M.create_dummy_mongo_buffer(type, lines)
     return MongoBuffer:new_dummy(type, lines)
 end
 
--- wrap_with_mongo_buffer creates a MongoBuffer object for given buffer.
+-- Create a MongoBuffer object for given buffer.
 ---@param type mongo.BufferType
 ---@param bufnr integer
 ---@return mongo.MongoBuffer
@@ -498,7 +480,7 @@ function M.wrap_with_mongo_buffer(type, bufnr)
     return mbuf
 end
 
--- try_get_mongo_buffer looks up mongo buffer object for given buffer number.
+-- Look up mongo buffer object for given buffer number.
 -- Returns such object if found, otherwise returns `nil`.
 ---@param bufnr integer
 ---@return mongo.MongoBuffer?

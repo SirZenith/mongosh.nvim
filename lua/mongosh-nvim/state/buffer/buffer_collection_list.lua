@@ -1,8 +1,6 @@
 local buffer_const = require "mongosh-nvim.constant.buffer"
-local script_const = require "mongosh-nvim.constant.mongosh_script"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
 local buffer_util = require "mongosh-nvim.util.buffer"
-local str_util = require "mongosh-nvim.util.str"
 
 local api = vim.api
 
@@ -27,7 +25,7 @@ function M.option_setter(mbuf)
     end, { buffer = bufnr })
 end
 
-function M.result_generator(mbuf, args, callback)
+function M.result_args_generator(mbuf, args, callback)
     local collection = args.collection
     if not collection then
         local bufnr = mbuf:get_bufnr()
@@ -40,21 +38,23 @@ function M.result_generator(mbuf, args, callback)
         collection = lines and lines[1]
     end
 
-    local content = str_util.format(script_const.SNIPPET_QUERY, {
-        collection = collection,
-    })
-
-    callback {
+    callback(nil, {
         type = BufferType.Query,
-        content = content,
-    }
+        state_args = {
+            collection = collection
+        }
+    })
 end
 
-function M.after_write_handler(_, src_buf, _)
-    local bufnr = src_buf and src_buf:get_bufnr()
-    if not bufnr then return end
+function M.on_result_successed(mbuf, result_obj)
+    local src_buf = mbuf:get_bufnr()
+    if not src_buf then return end
 
-    local win = buffer_util.get_win_by_buf(bufnr, true)
+    if result_obj:get_bufnr() == src_buf then
+        return
+    end
+
+    local win = buffer_util.get_win_by_buf(src_buf, true)
     if not win then return end
 
     api.nvim_win_hide(win)
@@ -65,6 +65,7 @@ function M.refresher(mbuf, callback)
     if not collections then return end
 
     mbuf:set_lines(collections)
+
     callback()
 end
 

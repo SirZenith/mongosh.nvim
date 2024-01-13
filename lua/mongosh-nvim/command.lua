@@ -4,7 +4,6 @@ local cmd_util = require "mongosh-nvim.util.command"
 
 local api_buffer = require "mongosh-nvim.api.buffer"
 local api_core = require "mongosh-nvim.api.core"
-local api_buffer = require "mongosh-nvim.api.buffer"
 local api_ui = require "mongosh-nvim.api.ui"
 
 ---@return boolean
@@ -222,6 +221,7 @@ cmd_util.new_cmd {
 }
 
 -- ----------------------------------------------------------------------------
+-- `new` Buffer
 
 local cmd_mongo_new = cmd_util.new_cmd {
     parent = cmd_mongo,

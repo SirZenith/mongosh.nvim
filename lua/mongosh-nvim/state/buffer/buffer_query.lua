@@ -1,12 +1,26 @@
-local api_core = require "mongosh-nvim.api.core"
+local script_const = require "mongosh-nvim.constant.mongosh_script"
 local buffer_const = require "mongosh-nvim.constant.buffer"
-local log = require "mongosh-nvim.log"
-local ts_util = require "mongosh-nvim.util.tree_sitter"
+local str_util = require "mongosh-nvim.util.str"
+local extract = require "mongosh-nvim.util.tree_sitter.query_collection_extraction"
 
 local BufferType = buffer_const.BufferType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
+
+function M.content_writer(mbuf, callback)
+    local collection = mbuf._state_args.collection
+    if not collection then
+        callback "no collection name binded with this buffer"
+    end
+
+    local content = str_util.format(script_const.SNIPPET_QUERY, {
+        collection = collection,
+    })
+    mbuf:set_lines(content)
+
+    callback()
+end
 
 function M.option_setter(mbuf)
     local bufnr = mbuf:get_bufnr()
@@ -21,30 +35,21 @@ function M.option_setter(mbuf)
     bo.filetype = "typescript"
 end
 
-function M.result_generator(mbuf, args, callback)
+function M.result_args_generator(mbuf, args, callback)
     local lines = args.with_range
         and mbuf:get_visual_selection()
         or mbuf:get_lines()
-    local query = table.concat(lines, "\n")
 
-    api_core.do_query(query, function(err, response)
-        if err then
-            log.warn(err)
-            callback {}
-            return
-        end
+    local snippet = table.concat(lines, "\n")
+    local collection = extract.get_collection_name(snippet)
 
-        local collection = ts_util.get_collection_name(query)
-
-        callback {
-            type = BufferType.QueryResult,
-            content = response,
-            state_args = {
-                query = query,
-                collection = collection,
-            }
+    callback(nil, {
+        type = BufferType.QueryResult,
+        state_args = {
+            snippet = snippet,
+            collection = collection,
         }
-    end)
+    })
 end
 
 return M

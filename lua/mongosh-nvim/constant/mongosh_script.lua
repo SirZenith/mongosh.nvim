@@ -1,41 +1,57 @@
 local M = {}
 
+-- ----------------------------------------------------------------------------
+-- Command
+
 -- get all available databases' name
 M.CMD_LIST_DBS = [[
-const result = db.adminCommand({ listDatabases: 1 }).databases.map(d => d.name)
-JSON.stringify(result)
+const result = db.adminCommand({ listDatabases: 1 }).databases.map(d => d.name);
+JSON.stringify(result);
 ]]
 
 -- get all available collections' name
 M.CMD_LIST_COLLECTIONS = [[
-JSON.stringify(db.getCollectionNames())
+JSON.stringify(db.getCollectionNames());
 ]]
 
--- query template with `$q` as query script place holder
+-- ----------------------------------------------------------------------------
+-- Template
+
+-- Query template with `${query}` as query script place holder.
+-- Query snippet should define following variable(s):
+--
+-- - `result`, any value, this  will be treated as query result, and gets printed.
 M.TEMPLATE_QUERY = [[
 // https://github.com/nodejs/node/issues/6456
 try {
-  process.stdout._handle.setBlocking(true);
+    process.stdout._handle.setBlocking(true);
 } catch (_e) {}
 
 config.set('inspectDepth', Infinity);
-const q = ${query};
-if (q && typeof q.toArray === 'function') q = q.toArray();
 
-const json = EJSON.stringify(q, null, ${indent})
-print(json)
-]]
+${query}
 
--- query template for finding one document with `_id`
-M.TEMPLATE_FIND_ONE = [[
-db["${collection}"].findOne({ _id: EJSON.deserialize(${id}) })
-]]
+{
+    const requirement = { result };
+    let err = null;
+    for (const [name, value] of Object.entries(requirement)) {
+        if (typeof value === 'undefined') {
+            err = `variable ${name} is undefined`;
+        }
+    }
 
-M.TEMPLATE_FIND_ONE_WITH_DOT_PATH = [[
-db["${collection}"].findOne(
-    { _id: EJSON.deserialize(${id}) },
-    ${filter}
-)
+    if (err) {
+        print(err);
+    } else {
+        let output = result;
+        if (output && typeof output.toArray === 'function') {
+            output = output.toArray();
+        }
+
+        const json = EJSON.stringify(output, null, ${indent});
+        print(json);
+    }
+}
 ]]
 
 -- editing template for replaceOne call, user should define following variable
@@ -47,29 +63,80 @@ db["${collection}"].findOne(
 M.TEMPLATE_EDIT = [[
 ${snippet}
 
-const result = db[collection].replaceOne({ _id: EJSON.deserialize(id) }, replacement)
+{
+    const requirement = { collection, id, replacement };
+    let err = null;
+    for (const [name, value] of Object.entries(requirement)) {
+        if (typeof value === 'undefined') {
+            err = `variable ${name} is undefined`;
+        }
+    }
 
-const json = EJSON.stringify(result, null, ${indent})
-print(json)
+    if (err) {
+        print(err);
+    } else {
+        const result = db[collection].replaceOne({ _id: EJSON.deserialize(id) }, replacement);
+        const json = EJSON.stringify(result, null, ${indent});
+        print(json);
+    }
+}
 ]]
 
+-- updatae template for `updateOne` call, user should define following variable
+-- in the snippet provided:
+--
+-- - `collection`, string value for specifying which collection to use
+-- - `id`, `_id` value of target document
+-- - `replacement`, new document value to use as `replaceOne` argument
 M.TEMPLATE_UPDATE_ONE = [[
 ${snippet}
 
-const result = db[collection].updateOne({ _id: EJSON.deserialize(id) }, { $set: replacement })
+{
+    const requirement = { collection, id, replacement };
+    let err = null;
+    for (const [name, value] of Object.entries(requirement)) {
+        if (typeof value === 'undefined') {
+            err = `variable ${name} is undefined`;
+        }
+    }
 
-const json = EJSON.stringify(result, null, ${indent})
-print(json)
+    if (err) {
+        print(err);
+    } else {
+        const result = db[collection].updateOne({ _id: EJSON.deserialize(id) }, { $set: replacement })
+        const json = EJSON.stringify(result, null, ${indent})
+        print(json)
+    }
+}
 ]]
+
+-- ----------------------------------------------------------------------------
+-- Snippet
 
 -- snippet template for querying
 M.SNIPPET_QUERY = [[
-db["${collection}"].find({})
+// Variable `result` will be treated as snippet output
+
+const collection = "${collection}"
+const filter = {}
+const projection = {}
+const result = db[collection].find(filter, projection)
+]]
+
+-- query template for finding one document with `_id`
+M.SNIPPET_FIND_ONE = [[
+// Variable `result` will be treated as snippet output
+
+const collection = "${collection}"
+const id = ${id}
+const projection = ${projection}
+const result = db[collection].findOne({ _id: EJSON.deserialize(id) }, projection)
 ]]
 
 -- snippet template for document editing
 M.SNIPPET_EDIT = [[
-// Edit document value here
+// Edit your document value
+
 const collection = "${collection}"
 const id = ${id}
 const replacement = EJSON.deserialize(${document})

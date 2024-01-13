@@ -60,4 +60,22 @@ function M.do_async_steps(steps)
     next_step()
 end
 
+---@return string
+local function pad_num(value)
+    if value < 0 or value >= 10 then
+        return tostring(value)
+    else
+        return "0" .. tostring(value)
+    end
+end
+
+-- Return current time in format HH:MM:SS
+---@return string
+function M.get_time_str()
+    local date = os.date("*t", os.time())
+    return ("%s:%s:%s"):format(
+        pad_num(date.hour), pad_num(date.min), pad_num(date.sec)
+    )
+end
+
 return M

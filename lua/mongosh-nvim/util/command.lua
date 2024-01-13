@@ -223,6 +223,11 @@ function Command:_redirect_to_sub_cmd_by_args(args, cur_index)
         return self, cur_index
     end
 
+    local is_available = not subcmd.available_checker or subcmd.available_checker()
+    if not is_available then
+        return self, cur_index
+    end
+
     return subcmd:_redirect_to_sub_cmd_by_args(args, cur_index + 1)
 end
 

@@ -26,7 +26,8 @@ end
 -- Create a new execute buffer for given collection name.
 ---@param win? integer # if not `nil`, buffer will be displayed in given window.
 function M.create_execute_buffer(win)
-    buffer_state.create_mongo_buffer(BufferType.Execute, {}, win)
+    local mbuf = buffer_state.create_mongo_buffer(BufferType.Execute, {})
+    mbuf:show(nil, win)
 end
 
 -- Create a new query buffer for given collection name.
@@ -40,11 +41,17 @@ function M.create_query_buffer(db, collection, win)
         return
     end
 
-    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.CollectionList, {})
-    mbuf:write_result {
-        win = win,
+    local mbuf = buffer_state.create_mongo_buffer(BufferType.Query, {})
+    mbuf:set_state_args {
         collection = collection,
     }
+    mbuf:content_writer(function(write_err)
+        if write_err then
+            log.warn(write_err)
+        else
+            mbuf:show(nil, win)
+        end
+    end)
 end
 
 -- Create a new buffer with editing snippet for given document.
@@ -52,12 +59,18 @@ end
 ---@param id string # `_id` of target document
 ---@param win? integer # if not `nil`, buffer will be displayed in given window.
 function M.create_edit_buffer(collection, id, win)
-    local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.QueryResult, {})
-    mbuf:write_result {
-        win = win,
+    local mbuf = buffer_state.create_mongo_buffer(BufferType.Edit, {})
+    mbuf:set_state_args {
         collection = collection,
         id = id,
     }
+    mbuf:content_writer(function(err)
+        if err then
+            log.warn(err)
+        else
+            mbuf:show(nil, win)
+        end
+    end)
 end
 
 -- ----------------------------------------------------------------------------

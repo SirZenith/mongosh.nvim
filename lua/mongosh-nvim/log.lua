@@ -1,21 +1,11 @@
-local M = {}
+local util = require "mongosh-nvim.util"
 
----@return string
-local function pad_num(value)
-    if value < 0 or value >= 10 then
-        return tostring(value)
-    else
-        return "0" .. tostring(value)
-    end
-end
+local M = {}
 
 ---@param msg string
 ---@param level? integer # vim.log.levels value
 function M.log(msg, level)
-    local date = os.date("*t", os.time())
-    local prefix = ("[mongo.nvim %s:%s:%s] - "):format(
-        pad_num(date.hour), pad_num(date.min), pad_num(date.sec)
-    )
+    local prefix = ("[mongo.nvim %s] - "):format(util.get_time_str())
 
     vim.notify(prefix .. msg, level)
 end

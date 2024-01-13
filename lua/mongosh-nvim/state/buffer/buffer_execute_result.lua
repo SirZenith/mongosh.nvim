@@ -1,19 +1,17 @@
 local api_core = require "mongosh-nvim.api.core"
-local buffer_util = require "mongosh-nvim.util.buffer"
+local util = require "mongosh-nvim.util"
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
-function M.refresher(mbuf, callback)
-    local src_bufnr = mbuf._src_bufnr
-
-    local src_lines = src_bufnr and buffer_util.read_lines_from_buf(src_bufnr)
+function M.content_writer(mbuf, callback)
+    local src_lines = mbuf:get_src_buf_lines()
     local snippet = src_lines
-        and table.concat(src_lines, "\n")
-        or mbuf._state_args.src_script
+        and table.concat(src_lines)
+        or mbuf._state_args.snippet
 
-    if not snippet or #snippet == 0 then
-        callback("no snippet is binded with current buffer")
+    if not snippet or snippet == "" then
+        callback "no snippet is binded with current buffer"
         return
     end
 
@@ -23,13 +21,16 @@ function M.refresher(mbuf, callback)
             return
         end
 
-        result = #result > 0 and result or "execution successed"
+        if result == "" then
+            result = util.get_time_str .. " - " .. "execution successed"
+        end
 
-        local lines = vim.split(result, "\n", { plain = true })
-        mbuf:set_lines(lines)
+        mbuf:set_lines(result)
 
         callback()
     end)
 end
+
+M.refresher = M.content_writer
 
 return M
