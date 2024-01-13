@@ -29,7 +29,7 @@ end
 function M.on_result_successed()
 end
 
-function M.refresher(callback)
+function M.refresher(_, callback)
     callback "current buffer doesn't support refreshing"
 end
 
