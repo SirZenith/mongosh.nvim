@@ -22,6 +22,8 @@ function M.content_writer(mbuf, callback)
 
         result = #result > 0 and result or "execution successed"
 
+        mbuf:set_lines(result)
+
         callback()
     end)
 end
