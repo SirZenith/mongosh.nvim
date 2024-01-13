@@ -30,6 +30,7 @@ local result_buffer_getter_map = {
         local buf = mbuf._result_bufnr
         if not buf
             or not api.nvim_buf_is_valid(buf)
+            or not api.nvim_buf_is_loaded(buf)
         then
             buf = api.nvim_create_buf(false, false)
         end
@@ -40,6 +41,7 @@ local result_buffer_getter_map = {
         local buf = mbuf:get_bufnr()
         if not buf
             or not api.nvim_buf_is_valid(buf)
+            or not api.nvim_buf_is_loaded(buf)
         then
             buf = api.nvim_create_buf(false, false)
         end
@@ -155,34 +157,39 @@ function MongoBuffer.get_buffer_obj(bufnr)
     return MongoBuffer._instance_map[bufnr]
 end
 
----@param type mongo.BufferType
----@param src_bufnr? integer
----@param result_bufnr? integer
----@param bufnr? integer # buffer number for this buffer object.
+---@class mongo.MongoBufferCreateArgs
+---@field type mongo.BufferType
+---@field src_bufnr? integer
+---@field result_bufnr? integer
+---@field bufnr? integer
+---@field is_user_buffer? boolean
+
+---@param args mongo.MongoBufferCreateArgs
 ---@return mongo.MongoBuffer
-function MongoBuffer:new(type, src_bufnr, result_bufnr, bufnr)
+function MongoBuffer:new(args)
     local obj = setmetatable({}, self)
 
+    local bufnr = args.bufnr
     if bufnr then
-        obj.is_user_buffer = true
+        obj._is_user_buffer = args.is_user_buffer ~= false
     else
         bufnr = api.nvim_create_buf(false, true)
-        obj.is_user_buffer = false
+        obj._is_user_buffer = false
     end
 
     self._instance_map[bufnr] = obj
 
     obj._bufnr = bufnr
-    obj._type = type
-    obj._src_bufnr = src_bufnr
-    obj._result_bufnr = result_bufnr
+    obj._type = args.type
+    obj._src_bufnr = args.src_bufnr
+    obj._result_bufnr = args.result_bufnr
     obj._state_args = {}
 
     obj:init_style()
     obj:init_autocmd()
     obj:setup_buf_options()
 
-    local on_create = config.dialog.on_create[type] or config.dialog.on_create[BufferType.Unknown]
+    local on_create = config.dialog.on_create[type] or config.dialog.on_create[FALLBACK_BUFFER_TYPE]
     if on_create then
         on_create(bufnr)
     end
@@ -398,8 +405,12 @@ function MongoBuffer:make_result_buffer_obj(type)
     local cur_buf = self:get_bufnr()
     local src_buf = buf ~= cur_buf and cur_buf or nil
 
-    local buf_obj = MongoBuffer:new(type, src_buf, nil, buf)
-    buf_obj._is_user_buffer = buf == cur_buf and self._is_user_buffer
+    local buf_obj = MongoBuffer:new {
+        type = type,
+        src_bufnr = src_buf,
+        bufnr = buf,
+        is_user_buffer = buf == cur_buf and self._is_user_buffer,
+    }
 
     return nil, buf_obj
 end
@@ -456,7 +467,7 @@ end
 ---@param lines string[]
 ---@return mongo.MongoBuffer
 function M.create_mongo_buffer(type, lines)
-    local mbuf = MongoBuffer:new(type)
+    local mbuf = MongoBuffer:new { type = type }
 
     mbuf:set_lines(lines)
 
@@ -476,7 +487,10 @@ end
 ---@param bufnr integer
 ---@return mongo.MongoBuffer
 function M.wrap_with_mongo_buffer(type, bufnr)
-    local mbuf = MongoBuffer:new(type, nil, nil, bufnr)
+    local mbuf = MongoBuffer:new {
+        type = type,
+        bufnr = bufnr,
+    }
     return mbuf
 end
 
