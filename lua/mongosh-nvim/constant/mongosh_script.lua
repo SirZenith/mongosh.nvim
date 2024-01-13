@@ -115,30 +115,30 @@ ${snippet}
 
 -- snippet template for querying
 M.SNIPPET_QUERY = [[
-// Variable `result` will be treated as snippet output
-
 const collection = "${collection}"
 const filter = {}
 const projection = {}
+
+// Variable `result` will be treated as snippet output
 const result = db[collection].find(filter, projection)
 ]]
 
 -- query template for finding one document with `_id`
 M.SNIPPET_FIND_ONE = [[
-// Variable `result` will be treated as snippet output
-
 const collection = "${collection}"
 const id = ${id}
 const projection = ${projection}
+
+// Variable `result` will be treated as snippet output
 const result = db[collection].findOne({ _id: EJSON.deserialize(id) }, projection)
 ]]
 
 -- snippet template for document editing
 M.SNIPPET_EDIT = [[
-// Edit your document value
-
 const collection = "${collection}"
 const id = ${id}
+
+// Edit your document value
 const replacement = EJSON.deserialize(${document})
 ]]
 
