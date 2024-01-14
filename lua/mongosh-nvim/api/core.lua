@@ -286,6 +286,20 @@ function M.do_query(query_snippet, callback, fallback_err_msg)
     M.do_execution(script_snippet, callback, fallback_err_msg or "query failed")
 end
 
+-- Wrap given query snippet in a query template then send it to mongosh.
+-- Query result contains BSON type info.
+---@param query_snippet string
+---@param callback fun(err: string?, result: string)
+---@param  fallback_err_msg? string
+function M.do_query_typed(query_snippet, callback, fallback_err_msg)
+    local script_snippet = str_util.format(script_const.TEMPLATE_QUERY_TYPED, {
+        query = query_snippet,
+        indent = tostring(config.indent_size),
+    })
+
+    M.do_execution(script_snippet, callback, fallback_err_msg or "query failed")
+end
+
 -- Fill given edit snippet into `replaceOne` call template and send it to mongosh.
 ---@param edit_snippet string
 ---@param callback fun(err: string?, result: string)

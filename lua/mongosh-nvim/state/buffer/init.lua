@@ -110,6 +110,7 @@ local OPERATION_MAP = {
     [BufferType.ExecuteResult] = require "mongosh-nvim.state.buffer.buffer_execute_result",
     [BufferType.Query] = require "mongosh-nvim.state.buffer.buffer_query",
     [BufferType.QueryResult] = require "mongosh-nvim.state.buffer.buffer_query_result",
+    [BufferType.QueryResultTree] = require "mongosh-nvim.state.buffer.buffer_query_result_tree",
     [BufferType.Edit] = require "mongosh-nvim.state.buffer.buffer_edit",
     [BufferType.EditResult] = require "mongosh-nvim.state.buffer.buffer_edit_result",
     [BufferType.Update] = require "mongosh-nvim.state.buffer.buffer_update",

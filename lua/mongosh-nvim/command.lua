@@ -186,10 +186,14 @@ cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "query",
     range = true,
-    action = function(_, orig_args)
+    arg_list = {
+        { name = "typed", type = "boolean", is_flag = true },
+    },
+    action = function(args, orig_args)
         api_buffer.run_buffer_query(
             vim.api.nvim_win_get_buf(0),
             {
+                is_typed = args.typed,
                 with_range = orig_args.range ~= 0,
             }
         )

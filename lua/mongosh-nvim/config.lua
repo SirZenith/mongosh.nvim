@@ -2,25 +2,26 @@ local buffer_const = require "mongosh-nvim.constant.buffer"
 
 local BufferType = buffer_const.BufferType
 local CreateBufferStyle = buffer_const.CreateBufferStyle
+local QueryResultStyle = buffer_const.QueryResultStyle
 local ResultSplitStyle = buffer_const.ResultSplitStyle
 
 local M = {}
 
 M = {
-    -- path to mongosh executable
+    -- Path to mongosh executable
     ---@type string
     executable = "mongosh",
 
-    -- indent space count for document representation in query result, edit snippet, etc.
+    -- Indent space count for document representation in query result, edit snippet, etc.
     ---@type integer
     indent_size = 4,
 
     connection = {
-        -- default database address for connection
+        -- Default database address for connection
         ---@type string
         default_db_addr = "localhost:27017",
 
-        -- names in this list won't be listed in available database list.
+        -- Names in this list won't be listed in available database list.
         ---@type string[]
         ignore_db_names = {
             "admin",
@@ -99,16 +100,22 @@ M = {
         create_buffer_style_type_map = {},
     },
 
+    query = {
+        -- What style of view should be used to display query result.
+        ---@type mongo.QueryResultStyle
+        result_style = QueryResultStyle.JSON,
+    },
+
     sidebar = {
-        -- column width of sidebar
+        -- Column width of sidebar
         ---@type integer
         width = 30,
 
-        -- left padding size for nested content.
+        -- Left padding size for nested content.
         ---@type integer
         padding = 4,
 
-        -- symbol for indication different types of list elemnt.
+        -- Symbol for indication different types of list elemnt.
         symbol = {
             loading = {
                 collection = " ",
@@ -126,6 +133,21 @@ M = {
                 collection = "󱔗 ",
             },
         },
+    },
+
+    tree_view = {
+        -- Right padding width after value type name.
+        ---@type integer
+        type_name_padding = 2,
+
+        -- Tree entry indent size.
+        ---@type integer
+        indent_size = 4,
+
+        -- Hex cololr code used by key name and bracket in different indent level.
+        -- Level 0 uses first color, level 1 uses second one, and so on.
+        ---@type string[]
+        indent_colors = {}
     },
 }
 

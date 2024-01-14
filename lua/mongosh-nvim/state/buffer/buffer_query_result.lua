@@ -21,7 +21,11 @@ function M.content_writer(mbuf, callback)
         return
     end
 
-    api_core.do_query(snippet, function(err, response)
+    local do_query = mbuf._state_args.is_typed
+        and api_core.do_query_typed
+        or api_core.do_query
+
+    do_query(snippet, function(err, response)
         if err then
             callback(err)
             return

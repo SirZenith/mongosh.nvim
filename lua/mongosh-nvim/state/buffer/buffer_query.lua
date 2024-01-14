@@ -1,9 +1,11 @@
+local config = require "mongosh-nvim.config"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local str_util = require "mongosh-nvim.util.str"
 local extract = require "mongosh-nvim.util.tree_sitter.query_collection_extraction"
 
 local BufferType = buffer_const.BufferType
+local QueryResultStyle = buffer_const.QueryResultStyle
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
@@ -43,9 +45,14 @@ function M.result_args_generator(mbuf, args, callback)
     local snippet = table.concat(lines, "\n")
     local collection = extract.get_collection_name(snippet)
 
+    local type = config.query.result_style == QueryResultStyle.Tree
+        and BufferType.QueryResultTree
+        or BufferType.QueryResult
+
     callback(nil, {
-        type = BufferType.QueryResult,
+        type = type,
         state_args = {
+            is_typed = args.is_typed,
             snippet = snippet,
             collection = collection,
         }

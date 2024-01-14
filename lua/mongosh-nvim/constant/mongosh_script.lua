@@ -54,6 +54,44 @@ ${query}
 }
 ]]
 
+-- Query template with `${query}` as query script place holder.
+-- JSON output contains BSON type info.
+-- Query snippet should define following variable(s):
+--
+-- - `result`, any value, this  will be treated as query result, and gets printed.
+M.TEMPLATE_QUERY_TYPED = [[
+// https://github.com/nodejs/node/issues/6456
+try {
+    process.stdout._handle.setBlocking(true);
+} catch (_e) {}
+
+config.set('inspectDepth', Infinity);
+
+${query}
+
+{
+    const requirement = { result };
+    let err = null;
+    for (const [name, value] of Object.entries(requirement)) {
+        if (typeof value === 'undefined') {
+            err = `variable ${name} is undefined`;
+        }
+    }
+
+    if (err) {
+        print(err);
+    } else {
+        let output = result;
+        if (output && typeof output.toArray === 'function') {
+            output = output.toArray();
+        }
+
+        const json = EJSON.stringify(output, null, ${indent}, { relaxed: false });
+        print(json);
+    }
+}
+]]
+
 -- editing template for replaceOne call, user should define following variable
 -- in the snippet provided:
 --

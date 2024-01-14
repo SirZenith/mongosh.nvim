@@ -3,6 +3,7 @@ local api_buffer = require "mongosh-nvim.api.buffer"
 local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local hl_const = require "mongosh-nvim.constant.highlight"
+local hl_util = require "mongosh-nvim.util.highlight"
 
 local api = vim.api
 
@@ -13,32 +14,9 @@ local HLGroup = hl_const.HighlightGroup
 
 local M = {}
 
----@class mongo.ui.SidebarHLItem
----@field name string
----@field st integer # stating column index, 0-base
----@field ed integer # ending column index, 0-base, exclusive
-
 ---@class mongo.ui.SidebarWriteInfo
 ---@field line string
----@field hl_items mongo.ui.SidebarHLItem[]
-
--- Update range of highlight items by matching text segment. Operation will
--- happen in place, the same highlight item list will be returned
----@param text_segments string[]
----@param hl_items mongo.ui.SidebarHLItem[]
----@return mongo.ui.SidebarHLItem[] hl_items
-local function update_hl_items_range(text_segments, hl_items)
-    local pos = 0
-    for i, item in ipairs(hl_items) do
-        local text = text_segments[i]
-        item.st = pos
-
-        pos = pos + text:len()
-        item.ed = pos
-    end
-
-    return hl_items
-end
+---@field hl_items mongo.higlight.HLItem[]
 
 ---@class mongo.ui.DBSideItem
 ---@field name string
@@ -93,7 +71,7 @@ function DBSideItem:write_name(buffer)
 
     buffer[#buffer + 1] = {
         line = table.concat(parts),
-        hl_items = update_hl_items_range(parts, {
+        hl_items = hl_util.update_hl_items_range(parts, {
             { name = HLGroup.Normal,         st = 0, ed = 0 },
             { name = HLGroup.DatabaseSymbol, st = 0, ed = 0 },
             { name = HLGroup.DatabaseName,   st = 0, ed = 0 },
@@ -121,7 +99,7 @@ function DBSideItem:write_collections(buffer)
 
         buffer[#buffer + 1] = {
             line = table.concat(parts),
-            hl_items = update_hl_items_range(parts, {
+            hl_items = hl_util.update_hl_items_range(parts, {
                 { name = HLGroup.Normal,                  st = 0, ed = 0 },
                 { name = HLGroup.CollectionLoadingSymbol, st = 0, ed = 0 },
                 { name = HLGroup.CollectionLoading,       st = 0, ed = 0 },
@@ -138,7 +116,7 @@ function DBSideItem:write_collections(buffer)
 
             buffer[#buffer + 1] = {
                 line = table.concat(parts),
-                hl_items = update_hl_items_range(parts, {
+                hl_items = hl_util.update_hl_items_range(parts, {
                     { name = HLGroup.Normal,           st = 0, ed = 0 },
                     { name = HLGroup.CollectionSymbol, st = 0, ed = 0 },
                     { name = HLGroup.CollectionName,   st = 0, ed = 0 },
@@ -363,7 +341,7 @@ function UIDBSidebar:write_to_buffer()
     local host_parts = { config.sidebar.symbol.collapsed.host, db_addr }
     write_infos[#write_infos + 1] = {
         line = table.concat(host_parts),
-        hl_items = update_hl_items_range(host_parts, {
+        hl_items = hl_util.update_hl_items_range(host_parts, {
             { name = HLGroup.HostSymbol, st = 0, ed = 0 },
             { name = HLGroup.HostName,   st = 0, ed = 0 },
         })
@@ -381,22 +359,17 @@ function UIDBSidebar:write_to_buffer()
     self.item_ranges = ranges
 
     local lines = {}
+    local hl_lines = {}
     for _, info in ipairs(write_infos) do
         lines[#lines + 1] = info.line
+        hl_lines[#hl_lines + 1] = info.hl_items
     end
 
     local bo = vim.bo[bufnr]
     bo.modifiable = true
 
     api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
-
-    for i, info in ipairs(write_infos) do
-        local line_num = i - 1
-        local items = info.hl_items
-        for _, item in ipairs(items) do
-            api.nvim_buf_add_highlight(bufnr, 0, item.name, line_num, item.st, item.ed)
-        end
-    end
+    hl_util.add_hl_to_buffer(bufnr, 0, hl_lines)
 
     bo.modifiable = false
 end

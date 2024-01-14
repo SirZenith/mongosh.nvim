@@ -65,6 +65,24 @@ function M.format(template, args)
     return result
 end
 
+-- Format string to fixed length. Shorter string will be fill with `fill` value
+-- with right alignment, longer string will be truncated.
+---@param s string
+---@param len integer
+---@param fill? string # default to space
+function M.format_len(s, len, fill)
+    fill = fill or " "
+    local delta = len - s:len()
+
+    if delta > 0 then
+        return (" "):rep(delta) .. s
+    elseif delta < 0 then
+        return s:sub(1, len)
+    end
+
+    return s
+end
+
 -- ----------------------------------------------------------------------------
 -- Scrambling
 
