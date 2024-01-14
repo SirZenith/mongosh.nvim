@@ -62,6 +62,7 @@ M.BSONValueType = {
     Code      = "code",      -- { $code: string, $scope: object }
     Date      = "date",      -- { $date: string }
     Decimal   = "decimal",   -- { $numberDecimal: string }
+    Double    = "double",    -- { $numberDouble: string }
     Int32     = "int32",     -- { $numberInt: string }
     Int64     = "int64",     -- { $numberLong: string }
     MaxKey    = "max_key",   -- { $maxKey: integer }

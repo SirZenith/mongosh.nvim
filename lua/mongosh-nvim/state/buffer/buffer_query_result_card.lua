@@ -125,6 +125,12 @@ local VALUE_TYPE_NAME_MAP = {
             builder:write(value["$numberDecimal"], HLGroup.ValueNumber)
         end,
     },
+    [ValueType.Double] = {
+        display_name = "f64",
+        write = function(value, builder)
+            builder:write(value["$numberDouble"], HLGroup.ValueNumber)
+        end,
+    },
     [ValueType.Int32] = {
         display_name = "i32",
         write = function(value, builder)
@@ -211,6 +217,7 @@ local COMPOSED_TYPE_IDENT_KEY = {
     ["$code"] = ValueType.Code,
     ["$date"] = ValueType.Date,
     ["$numberDecimal"] = ValueType.Decimal,
+    ["$numberDouble"] = ValueType.Double,
     ["$numberInt"] = ValueType.Int32,
     ["$numberLong"] = ValueType.Int64,
     ["$maxKey"] = ValueType.MaxKey,
@@ -404,6 +411,18 @@ function TreeViewItem:get_nested_table_type()
     return continous and NestingType.Array or NestingType.Object
 end
 
+-- Read current line length from builder. If line length is greater than recorded
+-- max content length, update recorded value.
+-- This method is supposed to be called before adding shifting builder to new
+-- line and after an child entry calls its `write_to_builder` method.
+---@param builder mongo.highlight.HighlightBuilder
+function TreeViewItem:try_update_max_content_col(builder)
+    local line_len = builder:get_cur_line_len()
+    if self.card_max_content_col  < line_len then
+        self.card_max_content_col = line_len
+    end
+end
+
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
 function TreeViewItem:write_simple_value(builder, indent_level)
@@ -473,6 +492,8 @@ function TreeViewItem:write_array_table(builder, indent_level)
 
     for i = 1, child_cnt do
         local item = children[i]
+
+        self:try_update_max_content_col(builder)
         builder:new_line()
 
         local is_card = is_top_level
@@ -487,10 +508,14 @@ function TreeViewItem:write_array_table(builder, indent_level)
         end
 
         item:write_to_builder(builder, indent_level + 1, is_card)
+        if item.card_max_content_col > self.card_max_content_col then
+            self.card_max_content_col = item.card_max_content_col
+        end
     end
 
     if not self.is_top_level then
         if child_cnt > 0 then
+            self:try_update_max_content_col(builder)
             builder:new_line()
             builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
             builder:write(edge_char, indent_hl_group)
@@ -530,6 +555,7 @@ function TreeViewItem:write_object_table(builder, indent_level, is_card)
         local key = keys[i]
         local item = children[key]
 
+        self:try_update_max_content_col(builder)
         builder:new_line()
         builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
 
@@ -546,15 +572,13 @@ function TreeViewItem:write_object_table(builder, indent_level, is_card)
         builder:write(": ", HLGroup.TreeNormal)
         item:write_to_builder(builder, indent_level + 1)
 
-        if is_card then
-            local line_len = builder:get_cur_line_len()
-            if line_len > self.card_max_content_col then
-                self.card_max_content_col = line_len
-            end
+        if item.card_max_content_col > self.card_max_content_col then
+            self.card_max_content_col = item.card_max_content_col
         end
     end
 
     if child_cnt > 0 then
+        self:try_update_max_content_col(builder)
         builder:new_line()
         builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
 
@@ -664,6 +688,7 @@ function TreeViewItem:finishing_object_cards(builder, indent_level)
     builder:seek_line(line_pos_cache)
 end
 
+-- Write tree structure into a highlight builder
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level? integer
 ---@param is_card? boolean
@@ -688,6 +713,8 @@ function TreeViewItem:write_to_builder(builder, indent_level, is_card)
     end
 end
 
+-- Format current tree structure with highlight and write readable form into
+-- given buffer.
 ---@param bufnr integer
 function TreeViewItem:write_to_buffer(bufnr)
     local builder = hl_util.HighlightBuilder:new()
@@ -698,6 +725,8 @@ function TreeViewItem:write_to_buffer(bufnr)
     hl_util.add_hl_to_buffer(bufnr, 0, hl_lines)
 end
 
+-- Try to toggle expansion state of an entry at row number `at_row`.
+-- If an entry do gets toggled, this function returns `true`.
 ---@parat_row integer # line number of cursor line, 1-base
 ---@return boolean updated
 function TreeViewItem:on_selected(at_row)
@@ -726,7 +755,7 @@ function TreeViewItem:on_selected(at_row)
     return updated
 end
 
--- Toggle entry expansion with current cursor position.
+-- Try to toggle expansion state of the entry under cursor.
 ---@param bufnr integer
 function TreeViewItem:select_with_cursor_pos(bufnr)
     local pos = vim.api.nvim_win_get_cursor(0)
@@ -809,10 +838,12 @@ local function set_up_buffer_keybinding(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
+    local key_cfg = config.card_view.keybinding
+
     local toggle_callback = function()
         toggle_entry_expansion(mbuf)
     end
-    for _, key in ipairs { "<CR>", "<Tab>", "za" } do
+    for _, key in ipairs(key_cfg.toggle_expansion) do
         vim.keymap.set("n", key, toggle_callback, { buffer = bufnr })
     end
 end

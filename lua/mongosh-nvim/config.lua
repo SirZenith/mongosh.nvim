@@ -156,7 +156,7 @@ M = {
             -- Minimum card display content width event when all cards' content
             -- are shorter.
             ---@type integer
-            min_content_width = 50,
+            min_content_width = 0,
 
             -- Padding on both left and right side of top level object card
             -- representation.
@@ -177,6 +177,12 @@ M = {
                 bottom_left = "└",
             },
         },
+
+        keybinding = {
+            -- Keys for toggle expansion state of the entry under cursor.
+            ---@type string[]
+            toggle_expansion = { "<CR>", "<Tab>", "za" }
+        }
     },
 }
 
