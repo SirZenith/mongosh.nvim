@@ -272,18 +272,18 @@ TreeViewItem.__index = TreeViewItem
 function TreeViewItem:new(value)
     local obj = setmetatable({}, self)
 
-    obj:init(value)
+    self.expanded = false
+    self.st_row = 0
+    self.ed_row = 0
+
+    obj:update_binded_value(value)
 
     return obj
 end
 
 ---@param value any
-function TreeViewItem:init(value)
+function TreeViewItem:update_binded_value(value)
     self.child_table_type = "none"
-
-    self.expanded = false
-    self.st_row = 0
-    self.ed_row = 0
 
     self.value = value
     self.type = ValueType.Unknown
@@ -306,10 +306,19 @@ function TreeViewItem:init(value)
 
         if self.type == ValueType.Unknown then
             -- array or object value
-            self.children = {}
+            local children = self.children
+            if not children then
+                children = {}
+                self.children = children
+            end
 
             for k, v in pairs(value) do
-                self.children[k] = TreeViewItem:new(v)
+                local child = children[k]
+                if child then
+                    child:update_binded_value(v)
+                else
+                    children[k] = TreeViewItem:new(v)
+                end
             end
 
             self.value = nil
@@ -551,7 +560,7 @@ local function update_tree_view(mbuf, typed_json)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
-    local tree_item = mbuf._state_args.tree_item
+    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
     if not tree_item then
         tree_item = TreeViewItem:new()
         mbuf._state_args.tree_item = tree_item
@@ -560,7 +569,7 @@ local function update_tree_view(mbuf, typed_json)
     end
 
     local value = vim.json.decode(typed_json)
-    tree_item:init(value)
+    tree_item:update_binded_value(value)
     tree_item:write_to_buffer(bufnr)
 end
 
@@ -607,7 +616,7 @@ function M.option_setter(mbuf)
             return
         end
 
-        local tree_item = mbuf._state_args.tree_item
+        local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
         if not tree_item then return end
 
         local pos = vim.api.nvim_win_get_cursor(0)
