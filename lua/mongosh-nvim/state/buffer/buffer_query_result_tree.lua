@@ -494,14 +494,6 @@ function TreeViewItem:write_to_builder(builder, indent_level)
 
     self.st_row = builder:get_line_cnt()
 
-    if self.is_top_level and self.child_table_type == "array" then
-        for _, child in pairs(self.children) do
-            if child.child_table_type ~= "none" then
-                child.is_top_level = true
-            end
-        end
-    end
-
     if self.children then
         self:write_table_value(builder, indent_level)
     else
@@ -524,10 +516,14 @@ end
 ---@parat_row integer # line number of cursor line, 1-base
 ---@return boolean updated
 function TreeViewItem:on_selected(at_row)
+    if at_row < self.st_row or at_row > self.ed_row then
+        return false
+    end
+
     local updated = false
 
     local children = self.children
-    if children then
+    if children and self.expanded then
         for _, item in pairs(children) do
             updated = item:on_selected(at_row)
 
