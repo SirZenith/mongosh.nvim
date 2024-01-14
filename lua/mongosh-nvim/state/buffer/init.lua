@@ -110,7 +110,7 @@ local OPERATION_MAP = {
     [BufferType.ExecuteResult] = require "mongosh-nvim.state.buffer.buffer_execute_result",
     [BufferType.Query] = require "mongosh-nvim.state.buffer.buffer_query",
     [BufferType.QueryResult] = require "mongosh-nvim.state.buffer.buffer_query_result",
-    [BufferType.QueryResultTree] = require "mongosh-nvim.state.buffer.buffer_query_result_tree",
+    [BufferType.QueryResultCard] = require "mongosh-nvim.state.buffer.buffer_query_result_card",
     [BufferType.Edit] = require "mongosh-nvim.state.buffer.buffer_edit",
     [BufferType.EditResult] = require "mongosh-nvim.state.buffer.buffer_edit_result",
     [BufferType.Update] = require "mongosh-nvim.state.buffer.buffer_update",
@@ -287,7 +287,16 @@ end
 -- Returns `nil` if this object is a dummy mongo buffer.
 ---@return integer? bufnr
 function MongoBuffer:get_bufnr()
-    return self._bufnr > 0 and self._bufnr or nil
+    local bufnr = self._bufnr
+    if not bufnr then return end
+
+    if not vim.api.nvim_buf_is_valid(bufnr)
+        or not vim.api.nvim_buf_is_loaded(bufnr)
+    then
+        return nil
+    end
+
+    return bufnr
 end
 
 ---@param split_style? mongo.ResultSplitStyle

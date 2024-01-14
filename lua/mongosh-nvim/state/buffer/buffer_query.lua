@@ -45,8 +45,8 @@ function M.result_args_generator(mbuf, args, callback)
     local snippet = table.concat(lines, "\n")
     local collection = extract.get_collection_name(snippet)
 
-    local type = config.query.result_style == QueryResultStyle.Tree
-        and BufferType.QueryResultTree
+    local type = config.query.result_style == QueryResultStyle.Card
+        and BufferType.QueryResultCard
         or BufferType.QueryResult
 
     callback(nil, {

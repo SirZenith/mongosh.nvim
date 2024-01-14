@@ -7,6 +7,7 @@ local hl_util = require "mongosh-nvim.util.highlight"
 local str_util = require "mongosh-nvim.util.str"
 
 local ValueType = buffer_const.BSONValueType
+local NestingType = buffer_const.TreeEntryNestingType
 local HLGroup = hl_const.HighlightGroup
 
 -- ----------------------------------------------------------------------------
@@ -15,7 +16,7 @@ local cached_highlight_group = {}
 
 -- Setup highlight group for indented keys.
 local function generate_indent_hl_groups()
-    for i, color in pairs(config.tree_view.indent_colors) do
+    for i, color in pairs(config.card_view.indent_colors) do
         local group_name = HLGroup.TreeIndented .. "_" .. tostring(i)
         vim.api.nvim_set_hl(0, group_name, { fg = color })
         cached_highlight_group[i] = group_name
@@ -26,7 +27,7 @@ end
 ---@param indent_level integer
 ---@return string hl_group
 local function get_key_hl_by_indent_level(indent_level)
-    local color_cnt = #config.tree_view.indent_colors
+    local color_cnt = #config.card_view.indent_colors
     if #cached_highlight_group ~= color_cnt then
         generate_indent_hl_groups()
     end
@@ -107,7 +108,6 @@ local VALUE_TYPE_NAME_MAP = {
     [ValueType.Date] = {
         display_name = "date",
         write = function(value, builder, indent_level)
-            vim.print(value)
             local hl_group = get_key_hl_by_indent_level(indent_level)
             local date_value = value["$date"]
             date_value = date_value["$numberLong"] or date_value
@@ -163,8 +163,20 @@ local VALUE_TYPE_NAME_MAP = {
     [ValueType.Object] = {
         display_name = "obj",
     },
+    [ValueType.ObjectID] = {
+        display_name = "oid",
+        write = function(value, builder, indent_level)
+            local hl_group = get_key_hl_by_indent_level(indent_level)
+            local id = ("%q"):format(value["$oid"])
+
+            builder:write("ObjectID", HLGroup.ValueObject)
+            builder:write("(", hl_group)
+            builder:write(id, HLGroup.ValueString)
+            builder:write(")", hl_group)
+        end,
+    },
     [ValueType.Regex] = {
-        display_name = "re",
+        display_name = "regx",
         write = function(value, builder)
             local pattern = value["$regularExpression"].pattern
             builder:write("/" .. pattern .. "/", HLGroup.ValueRegex)
@@ -202,6 +214,7 @@ local COMPOSED_TYPE_IDENT_KEY = {
     ["$numberLong"] = ValueType.Int64,
     ["$maxKey"] = ValueType.MaxKey,
     ["$minKey"] = ValueType.MinKey,
+    ["$oid"] = ValueType.ObjectID,
     ["$regularExpression"] = ValueType.Regex,
     ["$timestamp"] = ValueType.Timestamp,
 }
@@ -216,13 +229,21 @@ local SIMPLE_TYPE_MAP = {
 
 ---@param indent_level integer
 ---@param including_type_name_width? boolean # set this to `true` for lines not preceding by value type name
----@return string
-local function get_indent_str_by_indent_level(indent_level, including_type_name_width)
-    local indent_width = config.tree_view.type_name_padding + config.tree_view.indent_size * indent_level
+---@return integer
+local function get_indent_width_by_indent_level(indent_level, including_type_name_width)
+    local indent_width = config.card_view.card.padding + config.card_view.indent_size * indent_level
     if including_type_name_width then
         indent_width = indent_width + MAX_TYPE_NAME_LEN
     end
-    return (" "):rep(indent_width)
+    return indent_width
+end
+
+---@param indent_level integer
+---@param including_type_name_width? boolean # set this to `true` for lines not preceding by value type name
+---@return string
+local function get_indent_str_by_indent_level(indent_level, including_type_name_width)
+    local width = get_indent_width_by_indent_level(indent_level, including_type_name_width)
+    return (" "):rep(width)
 end
 
 -- ----------------------------------------------------------------------------
@@ -236,18 +257,19 @@ end
 ---@field line string
 ---@field hl_items mongo.higlight.HLItem[]
 
----@alias mongo.buffer.TreeNestingType
----| "object"
----| "array"
----| "none"
-
----@param type string
+---@param value_type string
 ---@return string
-local function get_type_display_name(type)
-    local type_name = type
+local function get_type_display_name(value_type)
+    local type_name = value_type
     local meta = VALUE_TYPE_NAME_MAP[type_name]
     type_name = meta and meta.display_name or type_name
     type_name = type_name and str_util.format_len(type_name, MAX_TYPE_NAME_LEN) or " - "
+
+    local margin_width = config.card_view.type_name_right_margin
+    if type(margin_width) == "number" and margin_width > 0 then
+        type_name = type_name .. (" "):rep(margin_width)
+    end
+
     return type_name
 end
 
@@ -259,11 +281,15 @@ end
 --
 ---@field is_top_level boolean # whether current item is tree view root
 ---@field children? table<number | string, mongo.buffer.TreeViewItem>
----@field child_table_type mongo.buffer.TreeNestingType
+---@field child_table_type mongo.TreeEntryNestingType
+---@field parent? mongo.buffer.TreeViewItem
 --
 ---@field expanded boolean
 ---@field st_row integer # 1-base beginning row number of display range
 ---@field ed_row integer # 1-base ending row number of display range
+--
+---@field card_st_col integer # 1-base column index, recording starting point of object card
+---@field card_max_content_col integer # 1-base column index, recording position of last character of longest card content line.
 local TreeViewItem = {}
 TreeViewItem.__index = TreeViewItem
 
@@ -275,6 +301,8 @@ function TreeViewItem:new(value)
     self.expanded = false
     self.st_row = 0
     self.ed_row = 0
+    self.card_st_col = 0
+    self.card_max_content_col = 0
 
     obj:update_binded_value(value)
 
@@ -283,7 +311,7 @@ end
 
 ---@param value any
 function TreeViewItem:update_binded_value(value)
-    self.child_table_type = "none"
+    self.child_table_type = NestingType.None
 
     self.value = value
     self.type = ValueType.Unknown
@@ -317,18 +345,31 @@ function TreeViewItem:update_binded_value(value)
                 if child then
                     child:update_binded_value(v)
                 else
-                    children[k] = TreeViewItem:new(v)
+                    child = TreeViewItem:new(v)
+                    children[k] = child
+                    child.parent = self
                 end
             end
 
             self.value = nil
             self.child_table_type = self:get_nested_table_type()
 
-            if self.child_table_type == "array" then
+            if self.child_table_type == NestingType.Array then
                 self.type = ValueType.Array
-            elseif self.child_table_type == "object" then
+            elseif self.child_table_type == NestingType.Object then
                 self.type = ValueType.Object
             end
+        end
+    end
+
+    if self.is_top_level
+        and self.child_table_type == NestingType.Array
+    then
+        self.expanded = true
+
+        local children = self.children
+        if children and #children == 1 then
+            children[1].expanded = true
         end
     end
 end
@@ -337,10 +378,10 @@ function TreeViewItem:toggle_expansion()
     self.expanded = not self.expanded
 end
 
----@return mongo.buffer.TreeNestingType
+---@return mongo.TreeEntryNestingType
 function TreeViewItem:get_nested_table_type()
     local children = self.children
-    if not children then return "none" end
+    if not children then return NestingType.None end
 
     local cnt = 0
     for _ in pairs(children) do
@@ -348,7 +389,7 @@ function TreeViewItem:get_nested_table_type()
     end
 
     if cnt == 0 then
-        return "none"
+        return NestingType.EmptyTable
     end
 
     local continous = true
@@ -359,7 +400,7 @@ function TreeViewItem:get_nested_table_type()
         end
     end
 
-    return continous and "array" or "object"
+    return continous and NestingType.Array or NestingType.Object
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
@@ -379,56 +420,79 @@ end
 function TreeViewItem:write_collapsed_table(builder, indent_level)
     local nesting_type = self.child_table_type
 
-    local lhs, rhs, digest = "<", ">", "?"
-    if nesting_type == "array" then
-        lhs, rhs, digest = "[", "]", "..."
-    elseif nesting_type == "object" then
-        lhs, rhs, digest = "{", "}", "..."
+    local children = self.children
+
+    local lhs, rhs = " <", ">"
+    local digest
+    if nesting_type == NestingType.Array then
+        lhs, rhs = " [", "]"
+        if children and #children > 0 then
+            digest = "..."
+        end
+    elseif nesting_type == NestingType.Object then
+        lhs, rhs = " {", "}"
+        if children then
+            for _ in pairs(children) do
+                digest = "..."
+                break
+            end
+        end
+    elseif nesting_type == NestingType.EmptyTable then
+        digest = "empty-table"
+    else
+        digest = "?"
     end
 
     local key_hl_group = get_key_hl_by_indent_level(indent_level)
     builder:write(lhs, key_hl_group)
-    builder:write(digest, HLGroup.ValueOmited)
+    if digest then
+        builder:write(digest, HLGroup.ValueOmited)
+    end
     builder:write(rhs, key_hl_group)
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
 function TreeViewItem:write_array_table(builder, indent_level)
-    if self.is_top_level then
+    -- Top level array is transparent, all elementse are exposed directly without
+    -- wrapping.
+
+    local is_top_level = self.is_top_level
+    if is_top_level then
         indent_level = indent_level - 1
     else
         builder:write("[", get_key_hl_by_indent_level(indent_level))
-        builder:new_line()
     end
 
+    local children = self.children or {}
+    local child_cnt = #children
     local indent_hl_group = get_key_hl_by_indent_level(indent_level)
-    local dirty = false
-    for i, item in ipairs(self.children) do
-        dirty = true
-        if i > 1 then
-            builder:new_line()
+
+    local edge_char = config.card_view.card.edge_char.left
+
+    for i = 1, child_cnt do
+        local item = children[i]
+        builder:new_line()
+
+        local is_card = is_top_level
+            and item.expanded
+            and item.child_table_type == NestingType.Object
+
+        builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
+
+        if not is_card then
+            builder:write(edge_char, indent_hl_group)
+            builder:write(get_indent_str_by_indent_level(indent_level + 1), indent_hl_group)
         end
 
-        local starting_edge = "│"
-        local indent = get_indent_str_by_indent_level(indent_level + 1)
-        if item.is_top_level and item.child_table_type ~= "none" then
-            starting_edge = "┌"
-            indent = ("─"):rep(indent:len())
-        end
-
-        builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
-
-        builder:write(starting_edge, indent_hl_group)
-        builder:write(indent, indent_hl_group)
-        item:write_to_builder(builder, indent_level + 1)
+        item:write_to_builder(builder, indent_level + 1, is_card)
     end
 
     if not self.is_top_level then
-        if dirty then
+        if child_cnt > 0 then
             builder:new_line()
             builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
-            builder:write("│", indent_hl_group)
+            builder:write(edge_char, indent_hl_group)
             builder:write(get_indent_str_by_indent_level(indent_level), HLGroup.TreeNormal)
         end
 
@@ -438,78 +502,189 @@ end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
-function TreeViewItem:write_object_table(builder, indent_level)
-    if self.is_top_level then
-        builder:write(("─"):rep(25), get_key_hl_by_indent_level(indent_level))
-    else
+---@param is_card boolean
+function TreeViewItem:write_object_table(builder, indent_level, is_card)
+    is_card = is_card or false
+
+    if not is_card then
         builder:write(("{"), get_key_hl_by_indent_level(indent_level))
     end
 
-    local indent_hl_group = get_key_hl_by_indent_level(indent_level)
+    local edge_char = config.card_view.card.edge_char.left
+    local nested_hl_group = get_key_hl_by_indent_level(indent_level + 1)
+    local key_hl_group = get_key_hl_by_indent_level(indent_level)
 
-    local dirty = false
-    for key, item in pairs(self.children) do
-        dirty = true
+    local children = self.children or {}
+    local keys = {}
+    if children then
+        for k in pairs(self.children) do
+            keys[#keys + 1] = k
+        end
+        table.sort(keys)
+    end
+
+    local child_cnt = #keys
+
+    for i = 1, child_cnt do
+        local key = keys[i]
+        local item = children[key]
+
         builder:new_line()
-
         builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
-        builder:write("│", indent_hl_group)
+
+        if is_card and self.card_st_col == 0 then
+            self.card_st_col = builder:get_cur_line_len()
+        end
+
+        local edge_hl_group = item.child_table_type ~= NestingType.None
+            and nested_hl_group
+            or key_hl_group
+        builder:write(edge_char, edge_hl_group)
         builder:write(get_indent_str_by_indent_level(indent_level + 1), HLGroup.TreeNormal)
-        builder:write(tostring(key), indent_hl_group)
+        builder:write(tostring(key), key_hl_group)
         builder:write(": ", HLGroup.TreeNormal)
         item:write_to_builder(builder, indent_level + 1)
+
+        if is_card then
+            local line_len = builder:get_cur_line_len()
+            if line_len > self.card_max_content_col then
+                self.card_max_content_col = line_len
+            end
+        end
     end
 
-    if dirty then
-        local ending_edge = "│"
-        local indent = get_indent_str_by_indent_level(indent_level)
-        if self.is_top_level then
-            ending_edge = "└"
-            indent = ("─"):rep(indent:len())
-        end
+    if child_cnt > 0 then
         builder:new_line()
         builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
-        builder:write(ending_edge, indent_hl_group)
-        builder:write(indent, indent_hl_group)
+
+        if not is_card then
+            builder:write(edge_char, key_hl_group)
+            builder:write(get_indent_str_by_indent_level(indent_level), key_hl_group)
+        end
     end
 
-    if self.is_top_level then
-        builder:write(("─"):rep(25), get_key_hl_by_indent_level(indent_level))
-    else
+    if not is_card then
         builder:write(("}"), get_key_hl_by_indent_level(indent_level))
     end
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
-function TreeViewItem:write_table_value(builder, indent_level)
+---@param is_card boolean
+function TreeViewItem:write_table_value(builder, indent_level, is_card)
     local nesting_type = self.child_table_type
 
-    if not self.expanded then
+    if not self.expanded or nesting_type == NestingType.EmptyTable then
         self:write_collapsed_table(builder, indent_level)
-    elseif nesting_type == "array" then
+    elseif nesting_type == NestingType.Array then
         self:write_array_table(builder, indent_level)
-    elseif nesting_type == "object" then
-        self:write_object_table(builder, indent_level)
+    elseif nesting_type == NestingType.Object then
+        self:write_object_table(builder, indent_level, is_card)
     else
         builder:write("<lua-table>", HLGroup.ValueOmited)
     end
 end
 
+-- Write all child object cards' edges to builder.
+---@param builder mongo.highlight.HighlightBuilder
+---@param indent_level integer
+function TreeViewItem:finishing_object_cards(builder, indent_level)
+    if self.child_table_type ~= NestingType.Array then
+        return
+    end
+
+    local line_pos_cache = builder:get_line_cnt()
+
+    local children = self.children
+    if not children then return end
+
+    local child_cnt = #children
+    if child_cnt == 0 then
+        return
+    end
+
+    local card_config = config.card_view.card
+    local min_card_width = card_config.min_content_width
+    local max_card_width = min_card_width
+    local max_col = MAX_TYPE_NAME_LEN + min_card_width
+
+    for i = 1, child_cnt do
+        local item = children[i]
+        local card_width = item.card_max_content_col - item.card_st_col
+        if card_width > max_card_width then
+            max_card_width = card_width
+            max_col = item.card_max_content_col
+        end
+    end
+    if max_card_width == 0 then return end
+
+    local padding_width = card_config.padding
+    local hl_group = get_key_hl_by_indent_level(indent_level)
+
+    local top_edge = table.concat {
+        card_config.corner_char.top_left,
+        card_config.edge_char.top:rep(max_card_width + padding_width),
+        card_config.corner_char.top_right,
+    }
+    local bottom_edge = table.concat {
+        card_config.corner_char.bottom_left,
+        card_config.edge_char.bottom:rep(max_card_width + padding_width),
+        card_config.corner_char.bottom_right,
+    }
+
+    local left_edge_len = card_config.edge_char.left:len()
+
+    for i = 1, child_cnt do
+        local item = children[i]
+        if item.expanded
+            and item.child_table_type == NestingType.Object
+        then
+            local st, ed = item.st_row, item.ed_row
+
+            builder:seek_line(st)
+            builder:write(top_edge, hl_group)
+
+            for row = st + 1, ed - 1 do
+                builder:seek_line(row)
+
+                local line_len = builder:get_cur_line_len()
+                local right_edge = table.concat {
+                    (" "):rep(max_col - line_len + padding_width + left_edge_len),
+                    card_config.edge_char.right,
+                }
+                builder:write(right_edge, hl_group)
+            end
+
+            builder:seek_line(ed)
+            builder:write(bottom_edge, hl_group)
+        end
+    end
+
+    builder:seek_line(line_pos_cache)
+end
+
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level? integer
-function TreeViewItem:write_to_builder(builder, indent_level)
+---@param is_card? boolean
+function TreeViewItem:write_to_builder(builder, indent_level, is_card)
     indent_level = indent_level or 0
+    is_card = is_card or false
 
     self.st_row = builder:get_line_cnt()
+    self.card_st_col = 0
+    self.card_max_content_col = 0
 
     if self.children then
-        self:write_table_value(builder, indent_level)
+        self:write_table_value(builder, indent_level, is_card)
     else
         self:write_simple_value(builder, indent_level)
     end
 
     self.ed_row = builder:get_line_cnt()
+
+    if self.is_top_level and self.expanded then
+        self:finishing_object_cards(builder, indent_level)
+    end
 end
 
 ---@param bufnr integer
@@ -550,6 +725,17 @@ function TreeViewItem:on_selected(at_row)
     return updated
 end
 
+-- Toggle entry expansion with current cursor position.
+---@param bufnr integer
+function TreeViewItem:select_with_cursor_pos(bufnr)
+    local pos = vim.api.nvim_win_get_cursor(0)
+    local updated = self:on_selected(pos[1])
+
+    if updated then
+        self:write_to_buffer(bufnr)
+    end
+end
+
 -- ----------------------------------------------------------------------------
 
 ---@type mongo.MongoBufferOperationModule
@@ -571,6 +757,30 @@ local function update_tree_view(mbuf, typed_json)
     local value = vim.json.decode(typed_json)
     tree_item:update_binded_value(value)
     tree_item:write_to_buffer(bufnr)
+end
+
+---@param mbuf mongo.MongoBuffer
+local function toggle_entry_expansion(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
+    if not tree_item then return end
+
+    tree_item:select_with_cursor_pos(bufnr)
+end
+
+---@param mbuf mongo.MongoBuffer
+local function set_up_buffer_keybinding(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local toggle_callback = function()
+        toggle_entry_expansion(mbuf)
+    end
+    for _, key in ipairs { "<CR>", "<Tab>", "za" } do
+        vim.keymap.set("n", key, toggle_callback, { buffer = bufnr })
+    end
 end
 
 function M.content_writer(mbuf, callback)
@@ -608,24 +818,7 @@ function M.option_setter(mbuf)
     bo.buflisted = false
     bo.buftype = "nofile"
 
-    -- press <Cr> to select a collection
-    vim.keymap.set("n", "<CR>", function()
-        if not vim.api.nvim_buf_is_valid(bufnr)
-            or not vim.api.nvim_buf_is_loaded(bufnr)
-        then
-            return
-        end
-
-        local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
-        if not tree_item then return end
-
-        local pos = vim.api.nvim_win_get_cursor(0)
-        local updated = tree_item:on_selected(pos[1])
-
-        if updated then
-            tree_item:write_to_buffer(bufnr)
-        end
-    end, { buffer = bufnr })
+    set_up_buffer_keybinding(mbuf)
 end
 
 M.refresher = M.content_writer

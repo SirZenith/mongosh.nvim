@@ -9,7 +9,7 @@ M.BufferType = {
     ExecuteResult = "execute_result",
     Query = "query",
     QueryResult = "query_result",
-    QueryResultTree = "query_result_tree",
+    QueryResultCard = "query_result_card",
     Edit = "edit",
     EditResult = "edit_result",
     Update = "update",
@@ -33,10 +33,18 @@ M.CreateBufferStyle = {
 ---@enum mongo.QueryResultStyle
 M.QueryResultStyle = {
     JSON = "json",
-    Tree = "tree",
+    Card = "card",
 }
 
 M.DB_SIDEBAR_FILETYPE = "mongosh-nvim-db-sidebar"
+
+---@enum mongo.TreeEntryNestingType
+M.TreeEntryNestingType = {
+    Object = "object",
+    Array = "array",
+    EmptyTable = "empty_table",
+    None = "none",
+}
 
 ---@enum mongo.BSONValueType
 M.BSONValueType = {
@@ -59,6 +67,7 @@ M.BSONValueType = {
     MaxKey    = "max_key",   -- { $maxKey: integer }
     MinKey    = "min_key",   -- { $minKey: integer }
     Object    = "object",
+    ObjectID  = "object_id", -- { $oid: string }
     Regex     = "regex",     -- { $regularExpression: { pattern: string, options: string } }
     Timestamp = "timestamp", -- { $timestamp: { t: integer, i: integer } }
 }

@@ -67,9 +67,33 @@ function HighlightBuilder:new()
     return obj
 end
 
+-- Current writing position of build.
 ---@return integer
 function HighlightBuilder:get_line_cnt()
     return self._cur_line
+end
+
+-- Set writing position to given `line_num`.
+---@param line_num integer
+function HighlightBuilder:seek_line(line_num)
+    local total = #self._lines
+    if line_num < 1 then
+        line_num = 1
+    elseif line_num > total then
+        line_num = total
+    end
+    self._cur_line = line_num
+end
+
+-- Get byte length of current line.
+---@return integer
+function HighlightBuilder:get_cur_line_len()
+    local line = self._lines[self._cur_line]
+    local sum = 0
+    for _, part in ipairs(line.parts) do
+        sum = sum + part:len()
+    end
+    return sum
 end
 
 -- Shifting to next line.

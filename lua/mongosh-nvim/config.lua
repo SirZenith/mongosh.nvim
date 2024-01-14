@@ -135,10 +135,11 @@ M = {
         },
     },
 
-    tree_view = {
-        -- Right padding width after value type name.
+    card_view = {
+        -- Right margin between right side of type name and left edge of top
+        -- level object cards.
         ---@type integer
-        type_name_padding = 2,
+        type_name_right_margin = 0,
 
         -- Tree entry indent size.
         ---@type integer
@@ -147,7 +148,34 @@ M = {
         -- Hex cololr code used by key name and bracket in different indent level.
         -- Level 0 uses first color, level 1 uses second one, and so on.
         ---@type string[]
-        indent_colors = {}
+        indent_colors = {},
+
+        -- Appearance setting for Object Card
+        card = {
+            -- Minimum card display content width event when all cards' content
+            -- are shorter.
+            ---@type integer
+            min_content_width = 50,
+
+            -- Padding on both left and right side of top level object card
+            -- representation.
+            ---@type integer
+            padding = 0,
+
+            edge_char = {
+                top = "─",
+                right = "│",
+                bottom = "─",
+                left = "│",
+            },
+
+            corner_char = {
+                top_left = "┌",
+                top_right = "┐",
+                bottom_right = "┘",
+                bottom_left = "└",
+            },
+        },
     },
 }
 
