@@ -1,9 +1,13 @@
 local api_core = require "mongosh-nvim.api.core"
 local buffer_const = require "mongosh-nvim.constant.buffer"
+local script_const = require "mongosh-nvim.constant.mongosh_script"
 local config = require "mongosh-nvim.config"
 local hl_const = require "mongosh-nvim.constant.highlight"
+local log = require "mongosh-nvim.log"
 local buffer_util = require "mongosh-nvim.util.buffer"
+local util = require "mongosh-nvim.util"
 local hl_util = require "mongosh-nvim.util.highlight"
+local list_util = require "mongosh-nvim.util.list"
 local str_util = require "mongosh-nvim.util.str"
 
 local BufferType = buffer_const.BufferType
@@ -43,6 +47,8 @@ end
 ---@class mongo.buffer.ValueTypeMeta
 ---@field display_name string
 ---@field write? fun(value: any, builder: mongo.highlight.HighlightBuilder, indent_level: integer)
+---@field edit_type? string # edit input value type description
+---@field edit? fun(value: string): string?, any # edit input value converter.
 
 ---@type table<mongo.BSONValueType, mongo.buffer.ValueTypeMeta>
 local VALUE_TYPE_NAME_MAP = {
@@ -58,27 +64,53 @@ local VALUE_TYPE_NAME_MAP = {
         display_name = "bool",
         write = function(value, builder)
             builder:write(tostring(value), HLGroup.ValueBoolean)
-        end
+        end,
+        edit_type = "boolean",
+        edit = function(value)
+            value = value:lower()
+            if value == "true" then
+                return nil, true
+            elseif value == "false" then
+                return nil, false
+            end
+            return "invalid bool string", nil
+        end,
     },
     [ValueType.Null] = {
         display_name = "null",
         write = function(_, builder)
             -- vim.NIL
             builder:write("null", HLGroup.ValueNull)
-        end
+        end,
+        edit_type = "raw JSON",
+        edit = function(value)
+            return nil, vim.json.decode(value)
+        end,
     },
     [ValueType.Number] = {
         display_name = "num",
         write = function(value, builder)
             builder:write(tostring(value), HLGroup.ValueNumber)
-        end
+        end,
+        edit_type = "number",
+        edit = function(value)
+            local num = tonumber(value)
+            if not num then
+                return "invalid number string", nil
+            end
+            return nil, num
+        end,
     },
     [ValueType.String] = {
         display_name = "str",
         write = function(value, builder)
             local quoted = ("%q"):format(value)
             builder:write(quoted, HLGroup.ValueString)
-        end
+        end,
+        edit_type = "string",
+        edit = function(value)
+            return nil, value
+        end,
     },
     -- ------------------------------------------------------------------------
     -- BSON value
@@ -93,7 +125,7 @@ local VALUE_TYPE_NAME_MAP = {
             builder:write("(", hl_group)
             builder:write("...", HLGroup.ValueOmited)
             builder:write(")", hl_group)
-        end
+        end,
     },
     [ValueType.Code] = {
         display_name = "code",
@@ -104,7 +136,7 @@ local VALUE_TYPE_NAME_MAP = {
             builder:write("(", hl_group)
             builder:write("...", HLGroup.ValueOmited)
             builder:write(")", hl_group)
-        end
+        end,
     },
     [ValueType.Date] = {
         display_name = "date",
@@ -117,12 +149,20 @@ local VALUE_TYPE_NAME_MAP = {
             builder:write("(", hl_group)
             builder:write(date_value, HLGroup.ValueString)
             builder:write(")", hl_group)
-        end
+        end,
+        edit_type = "date string",
+        edit = function(value)
+            return nil, { ["$date"] = value }
+        end,
     },
     [ValueType.Decimal] = {
         display_name = "i128",
         write = function(value, builder)
             builder:write(value["$numberDecimal"], HLGroup.ValueNumber)
+        end,
+        edit_type = "number",
+        edit = function(value)
+            return nil, { ["$numberDecimal"] = value }
         end,
     },
     [ValueType.Double] = {
@@ -130,17 +170,41 @@ local VALUE_TYPE_NAME_MAP = {
         write = function(value, builder)
             builder:write(value["$numberDouble"], HLGroup.ValueNumber)
         end,
+        edit_type = "number",
+        edit = function(value)
+            local num = tonumber(value)
+            if not num then
+                return "invalid number string", nil
+            end
+            return nil, { ["$numberDouble"] = value }
+        end,
     },
     [ValueType.Int32] = {
         display_name = "i32",
         write = function(value, builder)
             builder:write(value["$numberInt"], HLGroup.ValueNumber)
         end,
+        edit_type = "number",
+        edit = function(value)
+            local num = tonumber(value)
+            if not num then
+                return "invalid number string", nil
+            end
+            return nil, { ["$numberInt"] = value }
+        end,
     },
     [ValueType.Int64] = {
         display_name = "i64",
         write = function(value, builder)
             builder:write(value["$numberLong"], HLGroup.ValueNumber)
+        end,
+        edit_type = "number",
+        edit = function(value)
+            local num = tonumber(value)
+            if not num then
+                return "invalid number string", nil
+            end
+            return nil, { ["$numberLong"] = value }
         end,
     },
     [ValueType.MaxKey] = {
@@ -154,6 +218,14 @@ local VALUE_TYPE_NAME_MAP = {
             builder:write(tostring(key), HLGroup.ValueNumber)
             builder:write(")", hl_group)
         end,
+        edit_type = "number",
+        edit = function(value)
+            local num = tonumber(value)
+            if not num then
+                return "invalid number string", nil
+            end
+            return nil, { ["$maxKey"] = value }
+        end,
     },
     [ValueType.MinKey] = {
         display_name = "kMin",
@@ -165,6 +237,14 @@ local VALUE_TYPE_NAME_MAP = {
             builder:write("(", hl_group)
             builder:write(tostring(key), HLGroup.ValueNumber)
             builder:write(")", hl_group)
+        end,
+        edit_type = "number",
+        edit = function(value)
+            local num = tonumber(value)
+            if not num then
+                return "invalid number string", nil
+            end
+            return nil, { ["$minKey"] = value }
         end,
     },
     [ValueType.Object] = {
@@ -284,6 +364,7 @@ end
 -- ----------------------------------------------------------------------------
 
 ---@class mongo.buffer.TreeViewItem
+---@field name string | number
 ---@field value? any
 ---@field type string
 --
@@ -298,6 +379,7 @@ end
 --
 ---@field card_st_col integer # 1-base column index, recording starting point of object card
 ---@field card_max_content_col integer # 1-base column index, recording position of last character of longest card content line.
+---@field obj_key_show_order? (string | number)[] # display order of object field used during last write.
 local TreeViewItem = {}
 TreeViewItem.__index = TreeViewItem
 
@@ -355,6 +437,7 @@ function TreeViewItem:update_binded_value(value)
                 else
                     child = TreeViewItem:new(v)
                     children[k] = child
+                    child.name = k
                     child.parent = self
                 end
             end
@@ -418,7 +501,7 @@ end
 ---@param builder mongo.highlight.HighlightBuilder
 function TreeViewItem:try_update_max_content_col(builder)
     local line_len = builder:get_cur_line_len()
-    if self.card_max_content_col  < line_len then
+    if self.card_max_content_col < line_len then
         self.card_max_content_col = line_len
     end
 end
@@ -548,6 +631,7 @@ function TreeViewItem:write_object_table(builder, indent_level, is_card)
         end
         table.sort(keys)
     end
+    self.obj_key_show_order = keys
 
     local child_cnt = #keys
 
@@ -699,6 +783,7 @@ function TreeViewItem:write_to_builder(builder, indent_level, is_card)
     self.st_row = builder:get_line_cnt()
     self.card_st_col = 0
     self.card_max_content_col = 0
+    self.obj_key_show_order = nil
 
     if self.children then
         self:write_table_value(builder, indent_level, is_card)
@@ -766,37 +851,224 @@ function TreeViewItem:select_with_cursor_pos(bufnr)
     end
 end
 
+-- Try to find top most `_id` field of the entry under cursor.
+-- If such field is found, value of `_id` field and the Object entry containing
+-- that field will be returned.
 ---@param row? integer # 1-base row index, default to cursor row
 ---@return any?
-function TreeViewItem:find_id_field_with_cursor_pos(row)
+---@return mongo.buffer.TreeViewItem?
+function TreeViewItem:find_id_field_by_row_num(row)
     if not row then
         row = vim.api.nvim_win_get_cursor(0)[1]
     end
 
     if row < self.st_row or row > self.ed_row then
-        return
+        return nil, nil
     end
 
     local children = self.children
-    if not children then return end
+    if not children then return nil, nil end
 
-    local value
+    local value, target
     local nesting_type = self.child_table_type
     if nesting_type == NestingType.Object then
+        -- Searching stops at outter most layer of object entry. `_id` field
+        -- nested field value of object should be ignored.
         local item = children._id
         if item then
             value = item.value
+            target = self
         end
     elseif nesting_type == NestingType.Array then
         for _, item in ipairs(children) do
-            value = item:find_id_field_with_cursor_pos()
-            if value ~= nil then
+            value, target = item:find_id_field_by_row_num()
+            if value ~= nil and target ~= nil then
                 break
             end
         end
     end
 
-    return value
+    return value, target
+end
+
+-- Locate a field inside current entry at given row number.
+---@param row integer # 1-base row index.
+---@return mongo.buffer.TreeViewItem?
+function TreeViewItem:get_field_by_row_num(row)
+    if self.child_table_type == NestingType.None then
+        return nil
+    end
+
+    if row < self.st_row or row > self.ed_row then
+        return nil
+    end
+
+    if not self.expanded and row == self.st_row then
+        return self
+    end
+
+    local target
+
+    local children = self.children
+    if not children then return nil end
+
+    local ordered_keys = self.obj_key_show_order
+    local total_cnt = ordered_keys and #ordered_keys or #children
+
+    for i = 1, total_cnt do
+        local key = ordered_keys and ordered_keys[i] or i
+
+        local child = children[key]
+        if child.st_row > row then
+            break
+        end
+
+        if child.child_table_type == NestingType.None then
+            if row == child.st_row then
+                target = child
+            end
+        else
+            target = child:get_field_by_row_num(row)
+        end
+
+        if target then
+            break
+        end
+    end
+
+    if not target and row == self.st_row then
+        target = self
+    end
+
+    return target
+end
+
+---@class mongo.buffer.TreeEditTarget
+---@field id any
+---@field field mongo.buffer.TreeViewItem
+---@field dot_path (string | number)[]
+---@field edit_type? string
+---@field edit_handler fun(value: string): any
+
+---@param row integer
+---@return string? err
+---@return mongo.buffer.TreeEditTarget?
+function TreeViewItem:find_edit_target(row)
+    if not row then
+        row = vim.api.nvim_win_get_cursor(0)[1]
+    end
+
+    local id, item = self:find_id_field_by_row_num(row)
+    if id == nil or not item then
+        return "no `_id` field found in current entry", nil
+    end
+
+    if not item.expanded then
+        return "can't not edit collapsed entry", nil
+    end
+
+    local ordered_keys = item.obj_key_show_order
+    if not ordered_keys then
+        return "curent entry lacks field display order infomation", nil
+    end
+
+    local field = item:get_field_by_row_num(row)
+    if not field then
+        return "no field found under cursor", nil
+    end
+
+    local meta = VALUE_TYPE_NAME_MAP[field.type]
+    local edit_handler = meta and meta.edit
+    if not edit_handler then
+        local msg = "current field type doesn't support editing: " .. field.type
+        return msg, nil
+    end
+
+    local segments = {}
+    local walker = field
+    local path_err
+    repeat
+        local name = walker.name
+        if type(name) ~= "string" then
+            path_err = "editing array element is not supported"
+        elseif type(name) == "string" and name:sub(1, 1) == "$" then
+            path_err = "unrecognized field name " .. name
+        end
+
+        segments[#segments + 1] = name
+        walker = walker.parent
+    until path_err or walker == item or not walker
+
+    if path_err then
+        return path_err, nil
+    end
+
+    list_util.list_reverse(segments)
+
+    return nil, {
+        field = field,
+        id = id,
+        dot_path = segments,
+        edit_type = meta and meta.edit_type,
+        edit_handler = edit_handler,
+    }
+end
+
+-- Issue an edti to the entry at specified row number.
+---@param row? integer # 1-base row index, default to cursor row.
+---@param collection string
+---@param callback fun(err?: string)
+function TreeViewItem:try_update_entry_value(row, collection, callback)
+    if not row then
+        row = vim.api.nvim_win_get_cursor(0)[1]
+    end
+    local find_err, info = self:find_edit_target(row)
+    if find_err or not info then
+        callback(find_err or "can't find target field under cursor")
+        return
+    end
+
+    local dot_path = table.concat(info.dot_path, ".")
+
+    util.do_async_steps {
+        function(next_step)
+            local prompt = "Edit"
+            if info.edit_type then
+                prompt = prompt .. " (type: " .. info.edit_type .. ")"
+            end
+            vim.ui.input({ prompt = prompt .. ": " }, next_step)
+        end,
+        function(_, value_str)
+            if not value_str then
+                callback "edit abort"
+                return
+            end
+
+            local value_err, value = info.edit_handler(value_str)
+            if value_err then
+                callback(value_err)
+                return
+            end
+
+            local snippet = str_util.format(script_const.TEMPLATE_UPDATE_FIELD_VALUE, {
+                collection = collection,
+                id = vim.json.encode(info.id),
+                dot_path = dot_path,
+                value = vim.json.encode(value)
+            })
+
+            api_core.do_update_one(snippet, function(err, result)
+                if err then
+                    callback(err)
+                    return
+                end
+
+                result = #result > 0 and result or "execution successed"
+
+                callback()
+            end)
+        end
+    }
 end
 
 -- ----------------------------------------------------------------------------
@@ -819,7 +1091,11 @@ local function update_tree_view(mbuf, typed_json)
 
     local value = vim.json.decode(typed_json)
     tree_item:update_binded_value(value)
+
+    local bo = vim.bo[bufnr]
+    bo.modifiable = true
     tree_item:write_to_buffer(bufnr)
+    bo.modifiable = false
 end
 
 ---@param mbuf mongo.MongoBuffer
@@ -830,7 +1106,44 @@ local function toggle_entry_expansion(mbuf)
     local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
     if not tree_item then return end
 
+    local bo = vim.bo[bufnr]
+    bo.modifiable = true
     tree_item:select_with_cursor_pos(bufnr)
+    bo.modifiable = false
+end
+
+---@param mbuf mongo.MongoBuffer
+local function try_edit_field(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local collection = mbuf._state_args.collection
+    if not collection then
+        log.warn "no collection binded with current buffer"
+    end
+
+    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
+    if not tree_item then return end
+
+    util.do_async_steps {
+        function(next_step)
+            tree_item:try_update_entry_value(nil, collection, function(err)
+                if err then
+                    log.warn(err)
+                else
+                    log.info "value edited"
+                    next_step()
+                end
+            end)
+        end,
+        function()
+            M.refresher(mbuf, function(err)
+                if err then
+                    log.warn(err)
+                end
+            end)
+        end
+    }
 end
 
 ---@param mbuf mongo.MongoBuffer
@@ -840,11 +1153,16 @@ local function set_up_buffer_keybinding(mbuf)
 
     local key_cfg = config.card_view.keybinding
 
-    local toggle_callback = function()
-        toggle_entry_expansion(mbuf)
-    end
+    -- toggle entry expansion
+    local toggle_callback = function() toggle_entry_expansion(mbuf) end
     for _, key in ipairs(key_cfg.toggle_expansion) do
         vim.keymap.set("n", key, toggle_callback, { buffer = bufnr })
+    end
+
+    -- editing field
+    local edit_callback = function() try_edit_field(mbuf) end
+    for _, key in ipairs(key_cfg.edit_field) do
+        vim.keymap.set("n", key, edit_callback, { buffer = bufnr })
     end
 end
 
@@ -882,6 +1200,7 @@ function M.option_setter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
+    bo.modifiable = false
 
     set_up_buffer_keybinding(mbuf)
 end
@@ -899,7 +1218,7 @@ function M.result_args_generator(mbuf, args, callback)
         return
     end
 
-    local id = tree_item:find_id_field_with_cursor_pos()
+    local id = tree_item:find_id_field_by_row_num()
     if id == nil then
         callback "no `_id` field found under cursor"
         return

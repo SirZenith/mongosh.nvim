@@ -181,8 +181,12 @@ M = {
         keybinding = {
             -- Keys for toggle expansion state of the entry under cursor.
             ---@type string[]
-            toggle_expansion = { "<CR>", "<Tab>", "za" }
-        }
+            toggle_expansion = { "<CR>", "<Tab>", "za" },
+
+            -- Keys for initiate entry field editing.
+            ---@type string[]
+            edit_field = { "i" },
+        },
     },
 }
 

@@ -141,11 +141,27 @@ ${snippet}
     if (err) {
         print(err);
     } else {
-        const result = db[collection].updateOne({ _id: EJSON.deserialize(id) }, { $set: replacement })
+        const result = db[collection].updateOne(
+            { _id: EJSON.deserialize(id) },
+            { $set: EJSON.deserialize(replacement) }
+        )
         const json = EJSON.stringify(result, null, ${indent})
         print(json)
     }
 }
+]]
+
+M.TEMPLATE_UPDATE_FIELD_VALUE = [[
+const collection = "${collection}"
+const id = ${id}
+const replacement = {
+    ["${dot_path}"]: ${value}
+}
+
+db[collection].updateOne(
+    { _id: EJSON.deserialize(id) },
+    { $set: EJSON.deserialize(replacement) }
+)
 ]]
 
 -- ----------------------------------------------------------------------------

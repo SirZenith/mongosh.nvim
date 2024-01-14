@@ -38,23 +38,24 @@ function M.save_to_tmpfile(content, filename, callback)
     end)
 end
 
----@alias mongo.util.AsyncStepFunc fun(next_step: fun())
+---@alias mongo.util.AsyncStepFunc fun(next_step: fun(...: any), ...: any)
 
--- do_async_steps accepts a list of step function, each of them will be call
--- with a handle function `next_step`. When step function finish its work and
--- calls `next_step`, next step function will be executed.
+-- Accept a list of step function, each of them will be call with a handle
+-- function `next_step` as first argument. After step function finish its work
+-- it should calls `next_step`, all arguments passed to `next_step` will be
+-- passed on to next step function as extra arguments.
 ---@param steps mongo.util.AsyncStepFunc[]
 function M.do_async_steps(steps)
     local step_index = 0
 
     local next_step
-    next_step = function()
+    next_step = function(...)
         step_index = step_index + 1
 
         local step_func = steps[step_index]
         if not step_func then return end
 
-        step_func(next_step)
+        step_func(next_step, ...)
     end
 
     next_step()

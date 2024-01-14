@@ -105,7 +105,7 @@ cmd_util.new_cmd {
                 end
 
                 vim.ui.input({ prompt = "User Name: " }, function(input)
-                    connect_args.username = input
+                    connect_args.username = input or ""
                     next_step()
                 end)
             end,
@@ -118,7 +118,7 @@ cmd_util.new_cmd {
                 end
 
                 local input = vim.fn.inputsecret("Password: ")
-                connect_args.password = input
+                connect_args.password = input or ""
                 next_step()
             end,
 
@@ -130,7 +130,7 @@ cmd_util.new_cmd {
                 end
 
                 vim.ui.input({ prompt = "Auth Source DB: " }, function(input)
-                    connect_args.auth_source = input
+                    connect_args.auth_source = input or ""
                     next_step()
                 end)
             end,
