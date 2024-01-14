@@ -86,6 +86,7 @@ M = {
         ---@type table<mongo.ResultSplitStyle, mongo.ResultSplitStyle>
         split_style_type_map = {
             [BufferType.QueryResult] = ResultSplitStyle.Tab,
+            [BufferType.QueryResultCard] = ResultSplitStyle.Tab,
         },
 
         -- When this plugin should create a new result buffer.

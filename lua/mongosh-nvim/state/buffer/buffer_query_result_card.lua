@@ -6,6 +6,7 @@ local buffer_util = require "mongosh-nvim.util.buffer"
 local hl_util = require "mongosh-nvim.util.highlight"
 local str_util = require "mongosh-nvim.util.str"
 
+local BufferType = buffer_const.BufferType
 local ValueType = buffer_const.BSONValueType
 local NestingType = buffer_const.TreeEntryNestingType
 local HLGroup = hl_const.HighlightGroup
@@ -736,6 +737,39 @@ function TreeViewItem:select_with_cursor_pos(bufnr)
     end
 end
 
+---@param row? integer # 1-base row index, default to cursor row
+---@return any?
+function TreeViewItem:find_id_field_with_cursor_pos(row)
+    if not row then
+        row = vim.api.nvim_win_get_cursor(0)[1]
+    end
+
+    if row < self.st_row or row > self.ed_row then
+        return
+    end
+
+    local children = self.children
+    if not children then return end
+
+    local value
+    local nesting_type = self.child_table_type
+    if nesting_type == NestingType.Object then
+        local item = children._id
+        if item then
+            value = item.value
+        end
+    elseif nesting_type == NestingType.Array then
+        for _, item in ipairs(children) do
+            value = item:find_id_field_with_cursor_pos()
+            if value ~= nil then
+                break
+            end
+        end
+    end
+
+    return value
+end
+
 -- ----------------------------------------------------------------------------
 
 ---@type mongo.MongoBufferOperationModule
@@ -819,6 +853,35 @@ function M.option_setter(mbuf)
     bo.buftype = "nofile"
 
     set_up_buffer_keybinding(mbuf)
+end
+
+function M.result_args_generator(mbuf, args, callback)
+    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem
+    if not tree_item then
+        callback "no card view tree binded with this buffer"
+        return
+    end
+
+    local collection = args.collection or mbuf._state_args.collection
+    if collection == nil then
+        callback "no collection name binded with this buffer"
+        return
+    end
+
+    local id = tree_item:find_id_field_with_cursor_pos()
+    if id == nil then
+        callback "no `_id` field found under cursor"
+        return
+    end
+
+    callback(nil, {
+        type = BufferType.Edit,
+        state_args = {
+            collection = collection,
+            id = vim.json.encode(id),
+            -- dot_path = dot_path,
+        }
+    })
 end
 
 M.refresher = M.content_writer
