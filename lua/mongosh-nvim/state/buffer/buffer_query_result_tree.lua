@@ -262,7 +262,8 @@ end
 ---@field child_table_type mongo.buffer.TreeNestingType
 --
 ---@field expanded boolean
----@field ranges table<string | number, { st: integer, ed: integer }> # display range of all child item, 1-base, end inclusive
+---@field st_row integer # 1-base beginning row number of display range
+---@field ed_row integer # 1-base ending row number of display range
 local TreeViewItem = {}
 TreeViewItem.__index = TreeViewItem
 
@@ -280,8 +281,9 @@ end
 function TreeViewItem:init(value)
     self.child_table_type = "none"
 
-    self.expanded = true
-    self.ranges = {}
+    self.expanded = false
+    self.st_row = 0
+    self.ed_row = 0
 
     self.value = value
     self.type = ValueType.Unknown
@@ -384,57 +386,89 @@ end
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
 function TreeViewItem:write_array_table(builder, indent_level)
-    builder:write("[", get_key_hl_by_indent_level(indent_level))
+    if self.is_top_level then
+        indent_level = indent_level - 1
+    else
+        builder:write("[", get_key_hl_by_indent_level(indent_level))
+        builder:new_line()
+    end
 
+    local indent_hl_group = get_key_hl_by_indent_level(indent_level)
     local dirty = false
     for i, item in ipairs(self.children) do
         dirty = true
+        if i > 1 then
+            builder:new_line()
+        end
 
-        builder:new_line()
-        local st = builder:get_line_cnt()
+        local starting_edge = "│"
+        local indent = get_indent_str_by_indent_level(indent_level + 1)
+        if item.is_top_level and item.child_table_type ~= "none" then
+            starting_edge = "┌"
+            indent = ("─"):rep(indent:len())
+        end
 
-        builder:write(get_indent_str_by_indent_level(indent_level + 1, true), HLGroup.TreeNormal)
-        item:write_to_buffer(builder, indent_level + 1)
+        builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
 
-        local ed = builder:get_line_cnt()
-        self.ranges[i] = { st = st, ed = ed }
+        builder:write(starting_edge, indent_hl_group)
+        builder:write(indent, indent_hl_group)
+        item:write_to_builder(builder, indent_level + 1)
     end
 
-    if dirty then
-        builder:new_line()
-        builder:write(get_indent_str_by_indent_level(indent_level, true), HLGroup.TreeNormal)
-    end
+    if not self.is_top_level then
+        if dirty then
+            builder:new_line()
+            builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
+            builder:write("│", indent_hl_group)
+            builder:write(get_indent_str_by_indent_level(indent_level), HLGroup.TreeNormal)
+        end
 
-    builder:write("]", get_key_hl_by_indent_level(indent_level))
+        builder:write("]", get_key_hl_by_indent_level(indent_level))
+    end
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
 function TreeViewItem:write_object_table(builder, indent_level)
-    builder:write("{", get_key_hl_by_indent_level(indent_level))
+    if self.is_top_level then
+        builder:write(("─"):rep(25), get_key_hl_by_indent_level(indent_level))
+    else
+        builder:write(("{"), get_key_hl_by_indent_level(indent_level))
+    end
+
+    local indent_hl_group = get_key_hl_by_indent_level(indent_level)
 
     local dirty = false
     for key, item in pairs(self.children) do
         dirty = true
         builder:new_line()
-        local st = builder:get_line_cnt()
 
         builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
+        builder:write("│", indent_hl_group)
         builder:write(get_indent_str_by_indent_level(indent_level + 1), HLGroup.TreeNormal)
-        builder:write(tostring(key), get_key_hl_by_indent_level(indent_level))
+        builder:write(tostring(key), indent_hl_group)
         builder:write(": ", HLGroup.TreeNormal)
-        item:write_to_buffer(builder, indent_level + 1)
-
-        local ed = builder:get_line_cnt()
-        self.ranges[key] = { st = st, ed = ed }
+        item:write_to_builder(builder, indent_level + 1)
     end
 
     if dirty then
+        local ending_edge = "│"
+        local indent = get_indent_str_by_indent_level(indent_level)
+        if self.is_top_level then
+            ending_edge = "└"
+            indent = ("─"):rep(indent:len())
+        end
         builder:new_line()
-        builder:write(get_indent_str_by_indent_level(indent_level, true), HLGroup.TreeNormal)
+        builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
+        builder:write(ending_edge, indent_hl_group)
+        builder:write(indent, indent_hl_group)
     end
 
-    builder:write("}", get_key_hl_by_indent_level(indent_level))
+    if self.is_top_level then
+        builder:write(("─"):rep(25), get_key_hl_by_indent_level(indent_level))
+    else
+        builder:write(("}"), get_key_hl_by_indent_level(indent_level))
+    end
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
@@ -455,12 +489,17 @@ end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level? integer
-function TreeViewItem:write_to_buffer(builder, indent_level)
+function TreeViewItem:write_to_builder(builder, indent_level)
     indent_level = indent_level or 0
 
-    if self.is_top_level then
-        builder:write(get_type_display_name(self.type), HLGroup.ValueTypeName)
-        builder:write(get_indent_str_by_indent_level(indent_level), HLGroup.TreeNormal)
+    self.st_row = builder:get_line_cnt()
+
+    if self.is_top_level and self.child_table_type == "array" then
+        for _, child in pairs(self.children) do
+            if child.child_table_type ~= "none" then
+                child.is_top_level = true
+            end
+        end
     end
 
     if self.children then
@@ -468,6 +507,42 @@ function TreeViewItem:write_to_buffer(builder, indent_level)
     else
         self:write_simple_value(builder, indent_level)
     end
+
+    self.ed_row = builder:get_line_cnt()
+end
+
+---@param bufnr integer
+function TreeViewItem:write_to_buffer(bufnr)
+    local builder = hl_util.HighlightBuilder:new()
+    self:write_to_builder(builder)
+
+    local lines, hl_lines = builder:build()
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
+    hl_util.add_hl_to_buffer(bufnr, 0, hl_lines)
+end
+
+---@parat_row integer # line number of cursor line, 1-base
+---@return boolean updated
+function TreeViewItem:on_selected(at_row)
+    local updated = false
+
+    local children = self.children
+    if children then
+        for _, item in pairs(children) do
+            updated = item:on_selected(at_row)
+
+            if updated then
+                break
+            end
+        end
+    end
+
+    if not updated and at_row == self.st_row then
+        self:toggle_expansion()
+        updated = true
+    end
+
+    return updated
 end
 
 -- ----------------------------------------------------------------------------
@@ -483,18 +558,14 @@ local function update_tree_view(mbuf, typed_json)
     local tree_item = mbuf._state_args.tree_item
     if not tree_item then
         tree_item = TreeViewItem:new()
+        mbuf._state_args.tree_item = tree_item
+
         tree_item.is_top_level = true
     end
 
     local value = vim.json.decode(typed_json)
     tree_item:init(value)
-
-    local builder = hl_util.HighlightBuilder:new()
-    tree_item:write_to_buffer(builder)
-
-    local lines, hl_lines = builder:build()
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
-    hl_util.add_hl_to_buffer(bufnr, 0, hl_lines)
+    tree_item:write_to_buffer(bufnr)
 end
 
 function M.content_writer(mbuf, callback)
@@ -520,6 +591,36 @@ function M.content_writer(mbuf, callback)
 
         callback()
     end)
+end
+
+function M.option_setter(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = "delete"
+    bo.buflisted = false
+    bo.buftype = "nofile"
+
+    -- press <Cr> to select a collection
+    vim.keymap.set("n", "<CR>", function()
+        if not vim.api.nvim_buf_is_valid(bufnr)
+            or not vim.api.nvim_buf_is_loaded(bufnr)
+        then
+            return
+        end
+
+        local tree_item = mbuf._state_args.tree_item
+        if not tree_item then return end
+
+        local pos = vim.api.nvim_win_get_cursor(0)
+        local updated = tree_item:on_selected(pos[1])
+
+        if updated then
+            tree_item:write_to_buffer(bufnr)
+        end
+    end, { buffer = bufnr })
 end
 
 M.refresher = M.content_writer
