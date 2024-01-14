@@ -183,5 +183,34 @@ function M.run_edit_lines(lines, args)
 end
 
 -- ----------------------------------------------------------------------------
+-- Convert Buffer
+
+---@class mongo.args.ConvertQueryResult
+---@field to_type "json" | "card"
+
+---@param bufnr integer
+---@param args mongo.args.ConvertQueryResult
+function M.convert_query_result(bufnr, args)
+    local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+    if not mbuf then
+        log.warn "no buffer object attached to this buffer"
+        return
+    end
+
+    local type = mbuf:get_type()
+
+    local supported_types = {
+        [BufferType.QueryResult] = true,
+        [BufferType.QueryResultCard] = true,
+    }
+
+    if supported_types[type] then
+        mbuf:convert(args)
+    else
+        log.warn "this buffer is not query result"
+    end
+end
+
+-- ----------------------------------------------------------------------------
 
 return M

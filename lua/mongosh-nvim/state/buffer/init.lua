@@ -100,6 +100,7 @@ end
 ---@field on_result_failed? fun(mbuf: mongo.MongoBuffer, err: string)
 ---@field on_result_successed? fun(mbuf: mongo.MongoBuffer, result_obj: mongo.MongoBuffer)
 ---@field refresher? fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))
+---@field convert_type? fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(err?: string))
 
 ---@type table<mongo.BufferType, mongo.MongoBufferOperationModule>
 local OPERATION_MAP = {
@@ -127,6 +128,7 @@ local FALLBACK_OP_MODEL = OPERATION_MAP[FALLBACK_BUFFER_TYPE]
 ---@field _is_user_buffer boolean # Whether this buffer is created by user
 --
 ---@field _bufnr integer # buffer number of this buffer.
+---@field _winnr integer # window used by this object.
 ---@field _dummy_lines? string[] # for dummy buffer, this will be its content.
 ---@field _is_destroied boolean
 --
@@ -312,6 +314,7 @@ function MongoBuffer:show(split_style, win)
         return "failed to get window for result buffer", nil
     end
 
+    self._winnr = win
     api.nvim_win_set_buf(win, bufnr)
 end
 
@@ -404,26 +407,27 @@ end
 
 -- make_result_buffer_obj creates a mongo buffer object for writing result.
 ---@param type mongo.BufferType
+---@param bufnr? integer
 ---@return string? err
 ---@return mongo.MongoBuffer?
-function MongoBuffer:make_result_buffer_obj(type)
-    local buf = self:make_result_buffer()
-    if buf <= 0 then
+function MongoBuffer:make_result_buffer_obj(type, bufnr)
+    bufnr = bufnr or self:make_result_buffer()
+    if bufnr <= 0 then
         return "failed to create new buffer", nil
     end
 
     local cur_buf = self:get_bufnr()
-    local src_buf = buf ~= cur_buf and cur_buf or nil
+    local src_buf = bufnr ~= cur_buf and cur_buf or nil
 
-    local buf_obj = MongoBuffer.get_buffer_obj(buf)
+    local buf_obj = MongoBuffer.get_buffer_obj(bufnr)
     if buf_obj and buf_obj:get_type() == type then
         buf_obj._src_bufnr = src_buf
     else
         buf_obj = MongoBuffer:new {
             type = type,
             src_bufnr = src_buf,
-            bufnr = buf,
-            is_user_buffer = buf == cur_buf and self._is_user_buffer,
+            bufnr = bufnr,
+            is_user_buffer = bufnr == cur_buf and self._is_user_buffer,
         }
     end
 
@@ -473,6 +477,16 @@ function MongoBuffer:refresh()
             log.warn(err)
         else
             log.info("buffer refreshed")
+        end
+    end)
+end
+
+-- Convert current buffer into another type
+function MongoBuffer:convert(args)
+    self:convert_type(args, function(err)
+        if err then
+            log.warn(err)
+            return
         end
     end)
 end

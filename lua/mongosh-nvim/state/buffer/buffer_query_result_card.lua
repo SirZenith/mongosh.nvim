@@ -418,6 +418,7 @@ function TreeViewItem:update_binded_value(value)
         for key, type_name in pairs(COMPOSED_TYPE_IDENT_KEY) do
             if value[key] then
                 self.type = type_name
+                vim.print { key = key, type = type_name }
                 break
             end
         end
@@ -1050,6 +1051,9 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
                 return
             end
 
+            vim.print(value)
+            vim.print(vim.json.encode(value))
+
             local snippet = str_util.format(script_const.TEMPLATE_UPDATE_FIELD_VALUE, {
                 collection = collection,
                 id = vim.json.encode(info.id),
@@ -1235,5 +1239,30 @@ function M.result_args_generator(mbuf, args, callback)
 end
 
 M.refresher = M.content_writer
+
+function M.convert_type(mbuf, args, callback)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local to_type = args.to_type
+    if to_type == "card" then
+        callback "current buffer is already card view"
+        return
+    end
+
+    local err, new_buf = mbuf:make_result_buffer_obj(BufferType.QueryResult, bufnr)
+    if err or not new_buf then
+        callback(err or "failed to convert to new buffer")
+        return
+    end
+
+    local bo = vim.bo[bufnr]
+    bo.modifiable = true
+
+    new_buf._state_args = mbuf._state_args
+    new_buf:show(nil, mbuf._winnr)
+    new_buf:setup_buf_options()
+    new_buf:content_writer(callback)
+end
 
 return M

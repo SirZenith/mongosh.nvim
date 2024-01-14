@@ -33,4 +33,8 @@ function M.refresher(_, callback)
     callback "current buffer doesn't support refreshing"
 end
 
+function M.convert_type(_, _, callback)
+    callback()
+end
+
 return M

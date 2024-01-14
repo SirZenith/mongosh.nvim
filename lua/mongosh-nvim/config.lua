@@ -102,6 +102,10 @@ M = {
     },
 
     query = {
+        -- If set to `true`, used typed JSON for query result by default.
+        ---@type boolean
+        use_typed_query = false,
+
         -- What style of view should be used to display query result.
         ---@type mongo.QueryResultStyle
         result_style = QueryResultStyle.JSON,

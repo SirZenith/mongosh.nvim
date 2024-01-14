@@ -160,7 +160,7 @@ const replacement = {
 
 db[collection].updateOne(
     { _id: EJSON.deserialize(id) },
-    { $set: EJSON.deserialize(replacement) }
+    { $set: EJSON.deserialize(replacement, { relaxed: false }) }
 )
 ]]
 

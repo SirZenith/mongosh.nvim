@@ -292,4 +292,40 @@ cmd_util.new_cmd {
 
 -- ----------------------------------------------------------------------------
 
+local cmd_mongo_convert = cmd_util.new_cmd {
+    parent = cmd_mongo,
+    name = "convert",
+    available_checker = check_db_selected,
+}
+
+cmd_util.new_cmd {
+    parent = cmd_mongo_convert,
+    name = "query-result",
+    arg_list = {
+        { name = "json", type = "boolean", is_flag = true },
+        { name = "card", type = "boolean", is_flag = true },
+    },
+    action = function(args)
+        local to_type
+        if args.json then
+            to_type = "json"
+        elseif args.card then
+            to_type = "card"
+        end
+
+        if not to_type then
+            log.warn "invalid conver type"
+        end
+
+        api_buffer.convert_query_result(
+            vim.api.nvim_win_get_buf(0),
+            {
+                to_type = to_type
+            }
+        )
+    end,
+}
+
+-- ----------------------------------------------------------------------------
+
 cmd_mongo:register()

@@ -1,4 +1,5 @@
 local api_core = require "mongosh-nvim.api.core"
+local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local buffer_util = require "mongosh-nvim.util.buffer"
 local ts_util = require "mongosh-nvim.util.tree_sitter"
@@ -21,7 +22,12 @@ function M.content_writer(mbuf, callback)
         return
     end
 
-    local do_query = mbuf._state_args.is_typed
+    local is_type = mbuf._state_args.is_typed
+    if is_type == nil then
+        is_type = config.query.use_typed_query or false
+    end
+
+    local do_query = is_type
         and api_core.do_query_typed
         or api_core.do_query
 
@@ -83,5 +89,30 @@ function M.result_args_generator(mbuf, args, callback)
 end
 
 M.refresher = M.content_writer
+
+function M.convert_type(mbuf, args, callback)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local to_type = args.to_type
+    if to_type == "json" then
+        callback "current buffer is already JSON view"
+        return
+    end
+
+    local err, new_buf = mbuf:make_result_buffer_obj(BufferType.QueryResultCard, bufnr)
+    if err or not new_buf then
+        callback(err or "failed to convert to new buffer")
+        return
+    end
+
+    local bo = vim.bo[bufnr]
+    bo.filetype = ""
+
+    new_buf._state_args = mbuf._state_args
+    new_buf:show(nil, mbuf._winnr)
+    new_buf:setup_buf_options()
+    new_buf:content_writer(callback)
+end
 
 return M
