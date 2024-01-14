@@ -415,12 +415,17 @@ function MongoBuffer:make_result_buffer_obj(type)
     local cur_buf = self:get_bufnr()
     local src_buf = buf ~= cur_buf and cur_buf or nil
 
-    local buf_obj = MongoBuffer:new {
-        type = type,
-        src_bufnr = src_buf,
-        bufnr = buf,
-        is_user_buffer = buf == cur_buf and self._is_user_buffer,
-    }
+    local buf_obj = MongoBuffer.get_buffer_obj(buf)
+    if buf_obj and buf_obj:get_type() == type then
+        buf_obj._src_bufnr = src_buf
+    else
+        buf_obj = MongoBuffer:new {
+            type = type,
+            src_bufnr = src_buf,
+            bufnr = buf,
+            is_user_buffer = buf == cur_buf and self._is_user_buffer,
+        }
+    end
 
     return nil, buf_obj
 end
@@ -447,7 +452,9 @@ function MongoBuffer:write_result(args)
         local src_buf = self:get_bufnr()
         self._result_bufnr = result_buf ~= src_buf and result_buf or nil
 
-        buf_obj._state_args = result_args.state_args
+        buf_obj._state_args = vim.tbl_extend(
+            "force", buf_obj._state_args, result_args.state_args
+        )
         buf_obj:content_writer(function(err)
             if err then
                 self:on_result_failed(err)
