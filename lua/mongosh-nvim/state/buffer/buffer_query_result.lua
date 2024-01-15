@@ -10,11 +10,9 @@ local BufferType = buffer_const.BufferType
 local M = {}
 
 function M.content_writer(mbuf, callback)
-    local src_bufnr = mbuf._src_bufnr
-
-    local src_lines = src_bufnr and buffer_util.read_lines_from_buf(src_bufnr)
+    local src_lines = mbuf:get_src_buf_lines()
     local snippet = src_lines
-        and table.concat(src_lines)
+        and table.concat(src_lines, "\n")
         or mbuf._state_args.snippet
 
     if not snippet or snippet == "" then

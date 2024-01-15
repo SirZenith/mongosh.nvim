@@ -6,7 +6,7 @@ local M = {}
 function M.content_writer(mbuf, callback)
     local src_lines = mbuf:get_src_buf_lines()
     local snippet = src_lines
-        and table.concat(src_lines)
+        and table.concat(src_lines, "\n")
         or mbuf._state_args.snippet
 
     if not snippet or snippet == "" then
