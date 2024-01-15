@@ -3,8 +3,12 @@ local config = require "mongosh-nvim.config"
 local hl_const = require "mongosh-nvim.constant.highlight"
 local str_util = require "mongosh-nvim.util.str"
 
+local card_util = require "mongosh-nvim.state.buffer.buffer_query_result_card.util"
+
 local ValueType = buffer_const.BSONValueType
 local HLGroup = hl_const.HighlightGroup
+
+local get_key_hl_by_indent_level = card_util.get_key_hl_by_indent_level
 
 local M = {}
 
@@ -31,6 +35,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(tostring(value), HLGroup.ValueBoolean)
         end,
         edit_type = "boolean",
+        edit_default_value = function(value)
+            return value and "true" or "false"
+        end,
         edit = function(value)
             value = value:lower()
             if value == "true" then
@@ -48,6 +55,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write("null", HLGroup.ValueNull)
         end,
         edit_type = "raw JSON",
+        edit_default_value = function()
+            return "null"
+        end,
         edit = function(value)
             return nil, value
         end,
@@ -58,6 +68,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(tostring(value), HLGroup.ValueNumber)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return tostring(value)
+        end,
         edit = function(value)
             local num = tonumber(value)
             if not num then
@@ -73,6 +86,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(quoted, HLGroup.ValueString)
         end,
         edit_type = "string",
+        edit_default_value = function(value)
+            return value
+        end,
         edit = function(value)
             return nil, vim.json.encode(value)
         end,
@@ -126,6 +142,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(value["$numberDecimal"], HLGroup.ValueNumber)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return value["$numberDecimal"]
+        end,
         edit = function(value)
             return nil, ("{ $numberDecimal = %q }"):format(value)
         end,
@@ -136,6 +155,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(value["$numberDouble"], HLGroup.ValueNumber)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return value["$numberDouble"]
+        end,
         edit = function(value)
             local num = tonumber(value)
             if not num then
@@ -150,6 +172,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(value["$numberInt"], HLGroup.ValueNumber)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return value["$numberInt"]
+        end,
         edit = function(value)
             local num = tonumber(value)
             if not num then
@@ -164,6 +189,9 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(value["$numberLong"], HLGroup.ValueNumber)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return value["$numberLong"]
+        end,
         edit = function(value)
             local num = tonumber(value)
             if not num then
@@ -184,12 +212,15 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(")", hl_group)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return tostring(value["$maxKey"])
+        end,
         edit = function(value)
             local num = tonumber(value)
             if not num then
                 return "invalid number string", nil
             end
-            return nil, ("{ $maxKey: %q }"):format(value)
+            return nil, ("{ $maxKey: %d }"):format(value)
         end,
     },
     [ValueType.MinKey] = {
@@ -204,12 +235,15 @@ M.VALUE_TYPE_NAME_MAP = {
             builder:write(")", hl_group)
         end,
         edit_type = "number",
+        edit_default_value = function(value)
+            return tostring(value["$maxKey"])
+        end,
         edit = function(value)
             local num = tonumber(value)
             if not num then
                 return "invalid number string", nil
             end
-            return nil, ("{ $minKey: %q }"):format(value)
+            return nil, ("{ $minKey: %d }"):format(value)
         end,
     },
     [ValueType.Object] = {
