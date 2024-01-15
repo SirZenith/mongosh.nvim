@@ -30,6 +30,4 @@ function M.get_key_hl_by_indent_level(indent_level)
     return cached_highlight_group[color_index] or HLGroup.TreeNormal
 end
 
-
-
 return M

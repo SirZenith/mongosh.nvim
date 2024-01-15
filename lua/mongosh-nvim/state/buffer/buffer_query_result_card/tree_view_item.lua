@@ -124,6 +124,7 @@ function TreeViewItem:update_binded_value(value)
                 self.children = children
             end
 
+            -- update children value
             for k, v in pairs(value) do
                 local child = children[k]
                 if child then
@@ -133,6 +134,13 @@ function TreeViewItem:update_binded_value(value)
                     children[k] = child
                     child.name = k
                     child.parent = self
+                end
+            end
+
+            -- remove deleted children
+            for k in pairs(children) do
+                if value[k] == nil then
+                    children[k] = nil
                 end
             end
 
