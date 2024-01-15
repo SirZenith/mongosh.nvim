@@ -19,6 +19,25 @@ local M = {}
 ---@field edit_default_value? fun(value: any): string # default value used in input box.
 ---@field edit? fun(value: string): string?, string? # edit input value converter, returns error message and serialized JSON text for value.
 
+---@param value string
+---@param int_key string
+---@param float_key string
+---@returns string? err
+---@returns string? json_str
+local function int_value_serialize(value, int_key, float_key)
+    local num = tonumber(value)
+    if not num then
+        return "invalid number string", nil
+    end
+
+    local key = int_key
+    if num ~= math.floor(num) then
+        key = float_key
+    end
+
+    return nil, ("{ %s: %q }"):format(key, value)
+end
+
 ---@type table<mongo.BSONValueType, mongo.buffer.ValueTypeMeta>
 M.VALUE_TYPE_NAME_MAP = {
     -- ------------------------------------------------------------------------
@@ -154,7 +173,7 @@ M.VALUE_TYPE_NAME_MAP = {
             return value["$numberDecimal"]
         end,
         edit = function(value)
-            return nil, ("{ $numberDecimal = %q }"):format(value)
+            return int_value_serialize(value, "$numberDecimal", "$numberDouble")
         end,
     },
     [ValueType.Double] = {
@@ -184,11 +203,7 @@ M.VALUE_TYPE_NAME_MAP = {
             return value["$numberInt"]
         end,
         edit = function(value)
-            local num = tonumber(value)
-            if not num then
-                return "invalid number string", nil
-            end
-            return nil, ("{ $numberInt: %q }"):format(value)
+            return int_value_serialize(value, "$numberInt", "$numberDouble")
         end,
     },
     [ValueType.Int64] = {
@@ -201,11 +216,7 @@ M.VALUE_TYPE_NAME_MAP = {
             return value["$numberLong"]
         end,
         edit = function(value)
-            local num = tonumber(value)
-            if not num then
-                return "invalid number string", nil
-            end
-            return nil, ("{ $numberLong: %q }"):format(value)
+            return int_value_serialize(value, "$numberLong", "$numberDouble")
         end,
     },
     [ValueType.MaxKey] = {
