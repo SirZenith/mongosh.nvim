@@ -492,10 +492,10 @@ function TreeViewItem:write_to_builder(builder, indent_level, is_card)
     self.card_max_content_col = 0
     self.obj_key_show_order = nil
 
-    if self.children then
-        self:write_table_value(builder, indent_level, is_card)
-    else
+    if self.child_table_type == NestingType.None then
         self:write_simple_value(builder, indent_level)
+    else
+        self:write_table_value(builder, indent_level, is_card)
     end
 
     self.ed_row = builder:get_line_cnt()

@@ -28,6 +28,10 @@ M.VALUE_TYPE_NAME_MAP = {
         write = function(_, builder)
             builder:write("---", HLGroup.ValueUnknown)
         end,
+        edit_type = "raw JSON",
+        edit = function(value)
+            return nil, value
+        end,
     },
     [ValueType.Boolean] = {
         display_name = "bool",
@@ -97,6 +101,10 @@ M.VALUE_TYPE_NAME_MAP = {
     -- BSON value
     [ValueType.Array] = {
         display_name = "arr",
+        edit_type = "raw JSON",
+        edit = function(value)
+            return nil, value
+        end,
     },
     [ValueType.Binary] = {
         display_name = "bin",
@@ -248,6 +256,10 @@ M.VALUE_TYPE_NAME_MAP = {
     },
     [ValueType.Object] = {
         display_name = "obj",
+        edit_type = "raw JSON",
+        edit = function(value)
+            return nil, value
+        end,
     },
     [ValueType.ObjectID] = {
         display_name = "oid",
