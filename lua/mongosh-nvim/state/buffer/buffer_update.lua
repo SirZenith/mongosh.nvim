@@ -66,8 +66,6 @@ function M.option_setter(mbuf)
     bo.buftype = "nofile"
 
     bo.filetype = "typescript"
-
-    vim.print("update buffer")
 end
 
 function M.result_args_generator(mbuf, args, callback)

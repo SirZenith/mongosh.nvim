@@ -227,15 +227,15 @@ function TreeViewItem:write_collapsed_table(builder, indent_level)
 
     local children = self.children
 
-    local lhs, rhs = " <", ">"
+    local lhs, rhs = "<", ">"
     local digest
     if nesting_type == NestingType.Array then
-        lhs, rhs = " [", "]"
+        lhs, rhs = "[", "]"
         if children and #children > 0 then
             digest = "..."
         end
     elseif nesting_type == NestingType.Object then
-        lhs, rhs = " {", "}"
+        lhs, rhs = "{", "}"
         if children then
             for _ in pairs(children) do
                 digest = "..."
@@ -654,9 +654,7 @@ end
 ---@field id any
 ---@field field mongo.buffer.TreeViewItem
 ---@field dot_path (string | number)[]
----@field edit_type? string
----@field edit_default? fun(value: any): string
----@field edit_handler fun(value: string): string?, string?
+---@field meta mongo.buffer.ValueTypeMeta
 
 ---@param row integer
 ---@return string? err
@@ -686,24 +684,15 @@ function TreeViewItem:find_edit_target(row)
     end
 
     local meta = VALUE_TYPE_NAME_MAP[field.type]
-    local edit_handler = meta and meta.edit
-    if not edit_handler then
-        local msg = "current field type doesn't support editing: " .. field.type
-        return msg, nil
+    if not meta then
+        return "unrecognized type: " .. field.type, nil
     end
 
     local segments = {}
     local walker = field
     local path_err
     repeat
-        local name = walker.name
-        if type(name) ~= "string" then
-            path_err = "editing array element is not supported"
-        elseif type(name) == "string" and name:sub(1, 1) == "$" then
-            path_err = "unrecognized field name " .. name
-        end
-
-        segments[#segments + 1] = name
+        segments[#segments + 1] = walker.name
         walker = walker.parent
     until path_err or walker == item or not walker
 
@@ -717,9 +706,7 @@ function TreeViewItem:find_edit_target(row)
         field = field,
         id = id,
         dot_path = segments,
-        edit_type = meta and meta.edit_type,
-        edit_default = meta and meta.edit_default_value,
-        edit_handler = edit_handler,
+        meta = meta,
     }
 end
 
@@ -737,17 +724,40 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
         return
     end
 
+    -- dot path validation
+    local err_path
+    for _, segment in ipairs(info.dot_path) do
+        if type(segment) ~= "string" then
+            err_path = "editing array element is not supported"
+        elseif type(segment) == "string" and segment:sub(1, 1) == "$" then
+            err_path = "unrecognized field name " .. segment
+        end
+
+        if err_path then break end
+    end
+    if err_path then
+        callback(err_path)
+        return
+    end
+
+    local meta = info.meta
+    local edit_handler = meta.edit
+    if not edit_handler then
+        callback("current field type doesn't support editing: " .. info.field.type)
+        return
+    end
+
     local dot_path = table.concat(info.dot_path, ".")
 
     util.do_async_steps {
         function(next_step)
             local prompt = "Edit"
-            if info.edit_type then
-                prompt = prompt .. " (type: " .. info.edit_type .. ")"
+            if meta.edit_type then
+                prompt = prompt .. " (type: " .. meta.edit_type .. ")"
             end
             local default
-            if info.edit_default then
-                default = info.edit_default(info.field.value)
+            if meta.edit_default_value then
+                default = meta.edit_default_value(info.field.value)
             end
             vim.ui.input({ prompt = prompt .. ": ", default = default }, next_step)
         end,
@@ -757,7 +767,7 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
                 return
             end
 
-            local err_value, value_json = info.edit_handler(value_str)
+            local err_value, value_json = edit_handler(value_str)
             if err_value or not value_json then
                 callback(err_value or "invalid input value")
                 return

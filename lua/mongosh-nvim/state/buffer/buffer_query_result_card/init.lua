@@ -156,18 +156,36 @@ function M.result_args_generator(mbuf, args, callback)
         return
     end
 
-    local id = tree_item:find_id_field_by_row_num()
-    if id == nil then
-        callback "no `_id` field found under cursor"
+    local row = vim.api.nvim_win_get_cursor(0)[1]
+    local err, info = tree_item:find_edit_target(row)
+    if err or not info then
+        callback(err or "no field found under cursor")
         return
     end
 
+    local err_path
+    for _, segment in ipairs(info.dot_path) do
+        if type(segment) ~= "string" then
+            err_path = "editing array element is not supported"
+        elseif type(segment) == "string" and segment:sub(1, 1) == "$" then
+            err_path = "unrecognized field name " .. segment
+        end
+
+        if err_path then break end
+    end
+    if err_path then
+        callback(err_path)
+        return
+    end
+
+    local dot_path = table.concat(info.dot_path, ".")
+
     callback(nil, {
-        type = BufferType.Edit,
+        type = BufferType.Update,
         state_args = {
             collection = collection,
-            id = vim.json.encode(id),
-            -- dot_path = dot_path,
+            id = vim.json.encode(info.id),
+            dot_path = dot_path,
         }
     })
 end
