@@ -29,7 +29,11 @@ end
 ---@param bufnr integer
 ---@return string[]?
 function M.read_lines_from_buf(bufnr)
-    if vim.api.nvim_buf_is_valid(bufnr) then return nil end
+    if not vim.api.nvim_buf_is_valid(bufnr)
+        or not vim.api.nvim_buf_is_loaded(bufnr)
+    then
+        return nil
+    end
 
     local line_cnt = vim.api.nvim_buf_line_count(bufnr)
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, line_cnt, true)

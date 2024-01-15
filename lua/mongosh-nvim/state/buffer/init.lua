@@ -369,6 +369,8 @@ end
 ---@return string[]?
 function MongoBuffer:get_src_buf_lines()
     local src_bufnr = self._src_bufnr
+    if not src_bufnr then return nil end
+
     local src_lines = src_bufnr and buffer_util.read_lines_from_buf(src_bufnr)
     return src_lines
 end
