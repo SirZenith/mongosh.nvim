@@ -22,7 +22,7 @@ function M.content_writer(mbuf, callback)
         end
 
         if result == "" then
-            result = util.get_time_str .. " - " .. "execution successed"
+            result = util.get_time_str() .. " - " .. "execution successed"
         end
 
         mbuf:set_lines(result)
