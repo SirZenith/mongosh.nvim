@@ -209,7 +209,7 @@ local function clear_buffer_keybinding(mbuf)
         fold_key.expand_all,
         fold_key.fold_all,
     }
-    for key in pairs(fold_mapping) do
+    for _, key in ipairs(fold_mapping) do
         vim.keymap.del("n", key, options)
     end
 end
@@ -330,10 +330,9 @@ function M.convert_type(mbuf, args, callback)
         return
     end
 
-    local bo = vim.bo[bufnr]
-    bo.modifiable = true
-
+    new_buf._src_bufnr = mbuf._src_bufnr
     new_buf._state_args = mbuf._state_args
+
     new_buf:show(nil, mbuf._winnr)
     new_buf:setup_buf_options()
     new_buf:content_writer(callback)

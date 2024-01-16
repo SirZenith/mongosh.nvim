@@ -433,7 +433,7 @@ function MongoBuffer:make_result_buffer_obj(type, bufnr)
     end
 
     local cur_buf = self:get_bufnr()
-    local is_buf_reuse = bufnr ~= cur_buf
+    local is_buf_reuse = bufnr == cur_buf
 
     local src_buf
     if is_buf_reuse then
