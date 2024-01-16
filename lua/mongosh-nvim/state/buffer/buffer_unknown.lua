@@ -34,7 +34,7 @@ function M.refresher(_, callback)
 end
 
 function M.convert_type(_, _, callback)
-    callback()
+    callback "not supported conversion"
 end
 
 return M

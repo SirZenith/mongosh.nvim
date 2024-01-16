@@ -93,8 +93,8 @@ function M.convert_type(mbuf, args, callback)
     if not bufnr then return end
 
     local to_type = args.to_type
-    if to_type == "json" then
-        callback "current buffer is already JSON view"
+    if to_type ~= BufferType.QueryResultCard then
+        callback "not supported conversion"
         return
     end
 

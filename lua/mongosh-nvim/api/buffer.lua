@@ -185,30 +185,16 @@ end
 -- ----------------------------------------------------------------------------
 -- Convert Buffer
 
----@class mongo.args.ConvertQueryResult
----@field to_type "json" | "card"
-
 ---@param bufnr integer
----@param args mongo.args.ConvertQueryResult
-function M.convert_query_result(bufnr, args)
+---@param to_type any
+function M.buffer_convert(bufnr, to_type)
     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
     if not mbuf then
         log.warn "no buffer object attached to this buffer"
         return
     end
 
-    local type = mbuf:get_type()
-
-    local supported_types = {
-        [BufferType.QueryResult] = true,
-        [BufferType.QueryResultCard] = true,
-    }
-
-    if supported_types[type] then
-        mbuf:convert(args)
-    else
-        log.warn "this buffer is not query result"
-    end
+    mbuf:convert { to_type = to_type }
 end
 
 -- ----------------------------------------------------------------------------

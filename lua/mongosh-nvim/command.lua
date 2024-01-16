@@ -1,4 +1,6 @@
+local buffer_const = require "mongosh-nvim.constant.buffer"
 local log = require "mongosh-nvim.log"
+local buffer_state = require "mongosh-nvim.state.buffer"
 local util = require "mongosh-nvim.util"
 local cmd_util = require "mongosh-nvim.util.command"
 
@@ -6,9 +8,30 @@ local api_buffer = require "mongosh-nvim.api.buffer"
 local api_core = require "mongosh-nvim.api.core"
 local api_ui = require "mongosh-nvim.api.ui"
 
+local BufferType = buffer_const.BufferType
+
 ---@return boolean
 local function check_db_selected()
     return api_core.get_cur_db() ~= nil
+end
+
+---@param supported_types mongo.BufferType[]
+---@return fun(): boolean available_checker
+local function buffer_type_checker(supported_types)
+    local type_set = {}
+    for _, type in ipairs(supported_types) do
+        type_set[type] = true
+    end
+
+    return function()
+        local bufnr = vim.api.nvim_win_get_buf(0)
+
+        local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+        if not mbuf then return false end
+
+        local type = mbuf:get_type()
+        return type_set[type]
+    end
 end
 
 local cmd_mongo = cmd_util.new_cmd {
@@ -291,37 +314,38 @@ cmd_util.new_cmd {
 }
 
 -- ----------------------------------------------------------------------------
+-- Conversion
 
 local cmd_mongo_convert = cmd_util.new_cmd {
     parent = cmd_mongo,
     name = "convert",
-    available_checker = check_db_selected,
+    available_checker = function()
+        local bufnr = vim.api.nvim_win_get_buf(0)
+        local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
+        return mbuf ~= nil
+    end,
 }
 
 cmd_util.new_cmd {
     parent = cmd_mongo_convert,
-    name = "query-result",
-    arg_list = {
-        { name = "json", type = "boolean", is_flag = true },
-        { name = "card", type = "boolean", is_flag = true },
-    },
-    action = function(args)
-        local to_type
-        if args.json then
-            to_type = "json"
-        elseif args.card then
-            to_type = "card"
-        end
-
-        if not to_type then
-            log.warn "invalid conver type"
-        end
-
-        api_buffer.convert_query_result(
+    name = "card-result",
+    available_checker = buffer_type_checker { BufferType.QueryResult },
+    action = function()
+        api_buffer.buffer_convert(
             vim.api.nvim_win_get_buf(0),
-            {
-                to_type = to_type
-            }
+            BufferType.QueryResultCard
+        )
+    end,
+}
+
+cmd_util.new_cmd {
+    parent = cmd_mongo_convert,
+    name = "json-result",
+    available_checker = buffer_type_checker { BufferType.QueryResultCard },
+    action = function()
+        api_buffer.buffer_convert(
+            vim.api.nvim_win_get_buf(0),
+            BufferType.QueryResult
         )
     end,
 }
