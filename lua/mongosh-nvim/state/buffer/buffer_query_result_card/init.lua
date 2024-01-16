@@ -2,7 +2,6 @@ local api_core = require "mongosh-nvim.api.core"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local config = require "mongosh-nvim.config"
 local log = require "mongosh-nvim.log"
-local buffer_util = require "mongosh-nvim.util.buffer"
 local util = require "mongosh-nvim.util"
 
 local TreeViewItem = require "mongosh-nvim.state.buffer.buffer_query_result_card.tree_view_item"
@@ -13,6 +12,27 @@ local BufferType = buffer_const.BufferType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
+
+---@param bufnr integer
+---@param tree_item mongo.buffer.TreeViewItem
+local function update_tree_to_buffer(bufnr, tree_item)
+    local bo = vim.bo[bufnr]
+    bo.modifiable = true
+    tree_item:write_to_buffer(bufnr)
+    bo.modifiable = false
+end
+
+---@param mbuf mongo.MongoBuffer
+---@return integer? bufnr
+---@return mongo.buffer.TreeViewItem?
+local function try_get_tree_item(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return nil, nil end
+
+    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
+
+    return bufnr, tree_item
+end
 
 ---@param mbuf mongo.MongoBuffer
 local function update_tree_view(mbuf, typed_json)
@@ -85,31 +105,89 @@ local function try_edit_field(mbuf)
 end
 
 ---@param mbuf mongo.MongoBuffer
+---@param offset integer
+local function chnage_foldingy_level(mbuf, offset)
+    local bufnr, tree_item = try_get_tree_item(mbuf)
+    if not bufnr or not tree_item then
+        return
+    end
+
+    local level = tree_item.folding_level + offset
+
+    if tree_item:set_folding_level(level) then
+        update_tree_to_buffer(bufnr, tree_item)
+    end
+end
+
+---@param mbuf mongo.MongoBuffer
+local function fold_all(mbuf)
+    local bufnr, tree_item = try_get_tree_item(mbuf)
+    if not bufnr or not tree_item then
+        return
+    end
+
+    if tree_item:fold_all() then
+        update_tree_to_buffer(bufnr, tree_item)
+    end
+end
+
+---@param mbuf mongo.MongoBuffer
+local function expand_all(mbuf)
+    local bufnr, tree_item = try_get_tree_item(mbuf)
+    if not bufnr or not tree_item then
+        return
+    end
+
+    if tree_item:expand_all() then
+        update_tree_to_buffer(bufnr, tree_item)
+    end
+end
+
+---@param mbuf mongo.MongoBuffer
 local function set_up_buffer_keybinding(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
+    local options = { buffer = bufnr }
     local key_cfg = config.card_view.keybinding
 
     -- toggle entry expansion
     local toggle_callback = function() toggle_entry_expansion(mbuf) end
     for _, key in ipairs(key_cfg.toggle_expansion) do
-        vim.keymap.set("n", key, toggle_callback, { buffer = bufnr })
+        vim.keymap.set("n", key, toggle_callback, options)
     end
 
     -- editing field
     local edit_callback = function() try_edit_field(mbuf) end
     for _, key in ipairs(key_cfg.edit_field) do
-        vim.keymap.set("n", key, edit_callback, { buffer = bufnr })
+        vim.keymap.set("n", key, edit_callback, options)
+    end
+
+    -- folding operation
+    local fold_key = key_cfg.folding
+    local fold_mapping = {
+        [fold_key.fold_less] = function()
+            chnage_foldingy_level(mbuf, -1)
+        end,
+        [fold_key.fold_more] = function()
+            chnage_foldingy_level(mbuf, 1)
+        end,
+        [fold_key.expand_all] = function()
+            expand_all(mbuf)
+        end,
+        [fold_key.fold_all] = function()
+            fold_all(mbuf)
+        end,
+    }
+    for key, callback in pairs(fold_mapping) do
+        vim.keymap.set("n", key, callback, options)
     end
 end
 
 function M.content_writer(mbuf, callback)
-    local src_bufnr = mbuf._src_bufnr
-
-    local src_lines = src_bufnr and buffer_util.read_lines_from_buf(src_bufnr)
+    local src_lines = mbuf:get_src_buf_lines()
     local snippet = src_lines
-        and table.concat(src_lines)
+        and table.concat(src_lines, "\n")
         or mbuf._state_args.snippet
 
     if not snippet or snippet == "" then
@@ -197,8 +275,8 @@ function M.convert_type(mbuf, args, callback)
     if not bufnr then return end
 
     local to_type = args.to_type
-    if to_type == "card" then
-        callback "current buffer is already card view"
+    if to_type ~= BufferType.QueryResult then
+        callback "not supported conversion"
         return
     end
 
