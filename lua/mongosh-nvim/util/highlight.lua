@@ -96,6 +96,17 @@ function HighlightBuilder:get_cur_line_len()
     return sum
 end
 
+-- Get display width of current line.
+---@return integer
+function HighlightBuilder:get_cur_line_display_width()
+    local line = self._lines[self._cur_line]
+    local sum = 0
+    for _, part in ipairs(line.parts) do
+        sum = sum + vim.fn.strdisplaywidth(part)
+    end
+    return sum
+end
+
 -- Shifting to next line.
 function HighlightBuilder:new_line()
     local cur_line = self._cur_line + 1

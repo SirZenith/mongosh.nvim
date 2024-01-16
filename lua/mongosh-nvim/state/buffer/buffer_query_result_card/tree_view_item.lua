@@ -316,7 +316,7 @@ end
 -- line and after an child entry calls its `write_to_builder` method.
 ---@param builder mongo.highlight.HighlightBuilder
 function TreeViewItem:try_update_max_content_col(builder)
-    local line_len = builder:get_cur_line_len()
+    local line_len = builder:get_cur_line_display_width()
     if self.card_max_content_col < line_len then
         self.card_max_content_col = line_len
     end
@@ -465,7 +465,7 @@ function TreeViewItem:write_object_table(builder, indent_level, is_card)
         builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
 
         if is_card and self.card_st_col == 0 then
-            self.card_st_col = builder:get_cur_line_len()
+            self.card_st_col = builder:get_cur_line_display_width()
         end
 
         local edge_hl_group = item.child_table_type ~= NestingType.None
@@ -562,7 +562,7 @@ function TreeViewItem:finishing_object_cards(builder, indent_level)
         card_config.corner_char.bottom_right,
     }
 
-    local left_edge_len = card_config.edge_char.left:len()
+    local left_edge_len = vim.fn.strdisplaywidth(card_config.edge_char.left)
 
     for i = 1, child_cnt do
         local item = children[i]
@@ -577,7 +577,7 @@ function TreeViewItem:finishing_object_cards(builder, indent_level)
             for row = st + 1, ed - 1 do
                 builder:seek_line(row)
 
-                local line_len = builder:get_cur_line_len()
+                local line_len = builder:get_cur_line_display_width()
                 local right_edge = table.concat {
                     (" "):rep(max_col - line_len + padding_width + left_edge_len),
                     card_config.edge_char.right,
