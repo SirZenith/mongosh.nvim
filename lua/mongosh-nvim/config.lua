@@ -190,6 +190,14 @@ M = {
             -- Keys for initiate entry field editing.
             ---@type string[]
             edit_field = { "i" },
+
+            -- Folding operation related keys.
+            folding = {
+                fold_less = "zr",
+                fold_more = "zm",
+                expand_all = "zR",
+                fold_all = "zM",
+            }
         },
     },
 }
