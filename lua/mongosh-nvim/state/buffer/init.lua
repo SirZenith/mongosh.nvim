@@ -189,8 +189,9 @@ function MongoBuffer:new(args)
     obj._result_bufnr = args.result_bufnr
     obj._state_args = {}
 
-    obj:init_style()
     obj:init_autocmd()
+
+    obj:init_style()
     obj:setup_buf_options()
 
     local on_create = config.dialog.on_create[type] or config.dialog.on_create[FALLBACK_BUFFER_TYPE]
@@ -224,6 +225,19 @@ function MongoBuffer:new_dummy(type, lines)
     return obj
 end
 
+-- init_autocmd setups autocommand listening for this buffer.
+function MongoBuffer:init_autocmd()
+    local bufnr = self:get_bufnr()
+    if not bufnr then return end
+
+    api.nvim_create_autocmd("BufUnload", {
+        buffer = bufnr,
+        callback = function()
+            self:destory()
+        end
+    })
+end
+
 -- init_style initialize result managing style for this buffer object.
 function MongoBuffer:init_style()
     local result_config = config.result_buffer
@@ -239,19 +253,6 @@ function MongoBuffer:init_style()
     then
         self.create_buffer_style = CreateBufferStyle.OnNeed
     end
-end
-
--- init_autocmd setups autocommand listening for this buffer.
-function MongoBuffer:init_autocmd()
-    local bufnr = self:get_bufnr()
-    if not bufnr then return end
-
-    api.nvim_create_autocmd("BufUnload", {
-        buffer = bufnr,
-        callback = function()
-            self:destory()
-        end
-    })
 end
 
 -- Set buffer options when mongo buffer is attached to a buffer.
@@ -318,6 +319,8 @@ function MongoBuffer:show(split_style, win)
     local bufnr = self:get_bufnr()
     if not bufnr then return end
 
+    self:setup_buf_options()
+
     split_style = split_style or config.dialog.split_style
 
     win = win or make_result_win(split_style, bufnr)
@@ -342,6 +345,7 @@ function MongoBuffer:change_type_to(type)
     self:reset_buf_options()
 
     self._type = type
+
     self:init_style()
     self:setup_buf_options()
 end
@@ -433,19 +437,16 @@ function MongoBuffer:make_result_buffer_obj(type, bufnr)
     end
 
     local cur_buf = self:get_bufnr()
-    local is_buf_reuse = bufnr == cur_buf
-
-    local src_buf
-    if is_buf_reuse then
-        self:reset_buf_options()
-    else
-        src_buf = cur_buf
-    end
+    local src_buf = bufnr ~= cur_buf and cur_buf or nil
 
     local buf_obj = MongoBuffer.get_buffer_obj(bufnr)
     if buf_obj and buf_obj:get_type() == type then
         buf_obj._src_bufnr = src_buf
     else
+        if buf_obj then
+            buf_obj:reset_buf_options()
+        end
+
         buf_obj = MongoBuffer:new {
             type = type,
             src_bufnr = src_buf,

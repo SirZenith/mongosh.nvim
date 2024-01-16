@@ -324,18 +324,8 @@ function M.convert_type(mbuf, args, callback)
         return
     end
 
-    local err, new_buf = mbuf:make_result_buffer_obj(BufferType.QueryResult, bufnr)
-    if err or not new_buf then
-        callback(err or "failed to convert to new buffer")
-        return
-    end
-
-    new_buf._src_bufnr = mbuf._src_bufnr
-    new_buf._state_args = mbuf._state_args
-
-    new_buf:show(nil, mbuf._winnr)
-    new_buf:setup_buf_options()
-    new_buf:content_writer(callback)
+    mbuf:change_type_to(BufferType.QueryResult)
+    mbuf:content_writer(callback)
 end
 
 return M

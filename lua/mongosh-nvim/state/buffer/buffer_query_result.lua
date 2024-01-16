@@ -109,21 +109,8 @@ function M.convert_type(mbuf, args, callback)
         return
     end
 
-    local err_creation, new_buf = mbuf:make_result_buffer_obj(BufferType.QueryResultCard, bufnr)
-    if err_creation or not new_buf then
-        callback(err_creation or "failed to convert to new buffer")
-        return
-    end
-
-    new_buf._state_args = mbuf._state_args
-    new_buf:show(nil, mbuf._winnr)
-    new_buf:setup_buf_options()
-    new_buf:content_writer(function(err)
-        if not err then
-            vim.bo[bufnr].filetype = ""
-        end
-        callback(err)
-    end)
+    mbuf:change_type_to(BufferType.QueryResultCard)
+    mbuf:content_writer(callback)
 end
 
 return M
