@@ -1,3 +1,4 @@
+local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local log = require "mongosh-nvim.log"
 local buffer_state = require "mongosh-nvim.state.buffer"
@@ -329,8 +330,15 @@ local cmd_mongo_convert = cmd_util.new_cmd {
 cmd_util.new_cmd {
     parent = cmd_mongo_convert,
     name = "card-result",
+    arg_list = {
+        { name = "persist", type = "boolean", is_flag = true },
+    },
     available_checker = buffer_type_checker { BufferType.QueryResult },
-    action = function()
+    action = function(args)
+        if args.persist then
+            config.query.result_style = BufferType.QueryResultCard
+        end
+
         api_buffer.buffer_convert(
             vim.api.nvim_win_get_buf(0),
             BufferType.QueryResultCard
@@ -341,8 +349,15 @@ cmd_util.new_cmd {
 cmd_util.new_cmd {
     parent = cmd_mongo_convert,
     name = "json-result",
+    arg_list = {
+        { name = "persist", type = "boolean", is_flag = true },
+    },
     available_checker = buffer_type_checker { BufferType.QueryResultCard },
-    action = function()
+    action = function(args)
+        if args.persist then
+            config.query.result_style = BufferType.QueryResult
+        end
+
         api_buffer.buffer_convert(
             vim.api.nvim_win_get_buf(0),
             BufferType.QueryResult
