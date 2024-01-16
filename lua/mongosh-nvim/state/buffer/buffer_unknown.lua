@@ -3,11 +3,7 @@ local log = require "mongosh-nvim.log"
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
-function M.content_writer(mbuf, callback)
-    callback("current type doesn't support content generation: " .. mbuf:get_type())
-end
-
-function M.option_setter(mbuf)
+function M.on_enter(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -16,6 +12,21 @@ function M.option_setter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
+end
+
+function M.on_leave(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = ""
+    bo.buflisted = true
+    bo.buftype = ""
+end
+
+function M.content_writer(mbuf, callback)
+    callback("current type doesn't support content generation: " .. mbuf:get_type())
 end
 
 function M.result_args_generator(_, _, callback)

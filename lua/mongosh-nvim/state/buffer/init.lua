@@ -94,8 +94,9 @@ end
 ---@field state_args? table<string, any>
 
 ---@class mongo.MongoBufferOperationModule
+---@field on_enter? fun(mbuf: mongo.MongoBuffer)
+---@field on_leave? fun(mbuf: mongo.MongoBuffer)
 ---@field content_writer? fun(mbuf: mongo.MongoBuffer, callback: fun(err: string?))
----@field option_setter? fun(mbuf: mongo.MongoBuffer)
 ---@field result_args_generator? fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(err: string?, args: mongo.BufferResultArgs?))
 ---@field on_result_failed? fun(mbuf: mongo.MongoBuffer, err: string)
 ---@field on_result_successed? fun(mbuf: mongo.MongoBuffer, result_obj: mongo.MongoBuffer)
@@ -253,12 +254,22 @@ function MongoBuffer:init_autocmd()
     })
 end
 
+-- Set buffer options when mongo buffer is attached to a buffer.
 function MongoBuffer:setup_buf_options()
     if not self:get_bufnr() then return end
 
-    if self._is_user_buffer then return end
+    if not self._is_user_buffer then
+        self:on_enter()
+    end
+end
 
-    self:option_setter()
+-- Unset buffer options when mongo buffer is detach from a buffer.
+function MongoBuffer:reset_buf_options()
+    if not self:get_bufnr() then return end
+
+    if not self._is_user_buffer then
+        self:on_leave()
+    end
 end
 
 -- destory does clean up on buffer gets unloaded
@@ -326,8 +337,11 @@ end
 -- change_type_to switches buffer type to given `type`.
 ---@param type mongo.BufferType
 function MongoBuffer:change_type_to(type)
-    self._type = type
+    if type == self._type then return end
 
+    self:reset_buf_options()
+
+    self._type = type
     self:init_style()
     self:setup_buf_options()
 end
@@ -419,7 +433,14 @@ function MongoBuffer:make_result_buffer_obj(type, bufnr)
     end
 
     local cur_buf = self:get_bufnr()
-    local src_buf = bufnr ~= cur_buf and cur_buf or nil
+    local is_buf_reuse = bufnr ~= cur_buf
+
+    local src_buf
+    if is_buf_reuse then
+        self:reset_buf_options()
+    else
+        src_buf = cur_buf
+    end
 
     local buf_obj = MongoBuffer.get_buffer_obj(bufnr)
     if buf_obj and buf_obj:get_type() == type then

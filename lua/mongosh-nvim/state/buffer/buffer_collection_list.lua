@@ -9,7 +9,7 @@ local BufferType = buffer_const.BufferType
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
-function M.option_setter(mbuf)
+function M.on_enter(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -23,6 +23,19 @@ function M.option_setter(mbuf)
     vim.keymap.set("n", "<CR>", function()
         mbuf:write_result()
     end, { buffer = bufnr })
+end
+
+function M.on_leave(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = ""
+    bo.buflisted = true
+    bo.buftype = ""
+
+    vim.keymap.del("n", "<CR>", { buffer = bufnr })
 end
 
 function M.result_args_generator(mbuf, args, callback)

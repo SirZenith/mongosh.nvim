@@ -5,7 +5,7 @@ local BufferType = buffer_const.BufferType
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
-function M.option_setter(mbuf)
+function M.on_enter(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -14,8 +14,19 @@ function M.option_setter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
-
     bo.filetype = "typescript"
+end
+
+function M.on_leave(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = ""
+    bo.buflisted = true
+    bo.buftype = ""
+    bo.filetype = ""
 end
 
 function M.result_args_generator(mbuf, args, callback)

@@ -184,6 +184,64 @@ local function set_up_buffer_keybinding(mbuf)
     end
 end
 
+local function clear_buffer_keybinding(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local options = { buffer = bufnr }
+    local key_cfg = config.card_view.keybinding
+
+    -- toggle entry expansion
+    for _, key in ipairs(key_cfg.toggle_expansion) do
+        vim.keymap.del("n", key, options)
+    end
+
+    -- editing field
+    for _, key in ipairs(key_cfg.edit_field) do
+        vim.keymap.del("n", key, options)
+    end
+
+    -- folding operation
+    local fold_key = key_cfg.folding
+    local fold_mapping = {
+        fold_key.fold_less,
+        fold_key.fold_more,
+        fold_key.expand_all,
+        fold_key.fold_all,
+    }
+    for key in pairs(fold_mapping) do
+        vim.keymap.del("n", key, options)
+    end
+end
+
+function M.on_enter(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = "delete"
+    bo.buflisted = false
+    bo.buftype = "nofile"
+    bo.modifiable = false
+
+    set_up_buffer_keybinding(mbuf)
+end
+
+function M.on_leave(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = ""
+    bo.buflisted = true
+    bo.buftype = ""
+    bo.modifiable = true
+
+    clear_buffer_keybinding(mbuf)
+end
+
 function M.content_writer(mbuf, callback)
     local src_lines = mbuf:get_src_buf_lines()
     local snippet = src_lines
@@ -205,20 +263,6 @@ function M.content_writer(mbuf, callback)
 
         callback()
     end)
-end
-
-function M.option_setter(mbuf)
-    local bufnr = mbuf:get_bufnr()
-    if not bufnr then return end
-
-    local bo = vim.bo[bufnr]
-
-    bo.bufhidden = "delete"
-    bo.buflisted = false
-    bo.buftype = "nofile"
-    bo.modifiable = false
-
-    set_up_buffer_keybinding(mbuf)
 end
 
 function M.result_args_generator(mbuf, args, callback)

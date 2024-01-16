@@ -8,6 +8,30 @@ local BufferType = buffer_const.BufferType
 ---@type mongo.MongoBufferOperationModule
 local M = {}
 
+function M.on_enter(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = "delete"
+    bo.buflisted = false
+    bo.buftype = "nofile"
+    bo.filetype = "typescript"
+end
+
+function M.on_leave(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = ""
+    bo.buflisted = true
+    bo.buftype = ""
+    bo.filetype = ""
+end
+
 function M.content_writer(mbuf, callback)
     local collection = mbuf._state_args.collection
     if not collection then
@@ -46,19 +70,6 @@ function M.content_writer(mbuf, callback)
 
         callback()
     end, "failed to update document content")
-end
-
-function M.option_setter(mbuf)
-    local bufnr = mbuf:get_bufnr()
-    if not bufnr then return end
-
-    local bo = vim.bo[bufnr]
-
-    bo.bufhidden = "delete"
-    bo.buflisted = false
-    bo.buftype = "nofile"
-
-    bo.filetype = "typescript"
 end
 
 function M.result_args_generator(mbuf, args, callback)
