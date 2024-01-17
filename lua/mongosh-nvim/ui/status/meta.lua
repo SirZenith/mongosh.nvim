@@ -26,3 +26,4 @@
 ---@field default_args table<string, any>
 ---@field comp mongo.ui.status.Component
 
+---@alias mongo.ui.status.ComponentLoaderFunc fun(): mongo.ui.status.BuiltComponentInfo

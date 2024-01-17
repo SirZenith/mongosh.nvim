@@ -3,9 +3,6 @@ local log = require "mongosh-nvim.log"
 
 local status_base = require "mongosh-nvim.ui.status.base"
 
-local connection_comp = require "mongosh-nvim.ui.status.component.connection"
-local process_comp = require "mongosh-nvim.ui.status.component.process"
-
 local M = {}
 
 -- ----------------------------------------------------------------------------
@@ -22,11 +19,57 @@ local State = {
 }
 
 -- ----------------------------------------------------------------------------
+-- Component Loading
 
 ---@type (mongo.ui.status.Component | string)[]
 local active_components = {}
 ---@type (table | true)[]
 local active_component_args = {}
+
+-- Components are loaded on need, so that unnecessary events won't be registered.
+---@type table<mongo.ui.status.ComponentType, mongo.ui.status.ComponentLoaderFunc>
+local component_loader = {
+    _current_db = function()
+        local connection_comp = require "mongosh-nvim.ui.status.component.connection"
+        return connection_comp.current_db
+    end,
+
+    _running_cnt = function()
+        local process_comp = require "mongosh-nvim.ui.status.component.process"
+        return process_comp.running_cnt
+    end,
+    _process_state = function()
+        local process_comp = require "mongosh-nvim.ui.status.component.process"
+        return process_comp.process_state
+    end,
+    _mongosh_last_output = function()
+        local process_comp = require "mongosh-nvim.ui.status.component.process"
+        return process_comp.mongosh_last_output
+    end,
+}
+
+---@param tbl table<string, mongo.ui.status.BuiltComponentInfo>
+---@param key any
+---@return mongo.ui.status.BuiltComponentInfo?
+local function component_lazy_loader(tbl, key)
+    local comp = rawget(tbl, key)
+    if type(comp) == "function" then
+        return comp
+    end
+
+    local loader = component_loader[key]
+    comp = loader and loader()
+    if type(comp) ~= "table" then
+        return
+    end
+
+    rawset(tbl, key, comp)
+
+    return comp
+end
+
+---@type table<string, mongo.ui.status.BuiltComponentInfo>
+local components = setmetatable({}, { __index = component_lazy_loader })
 
 -- Load a component by parsing component specification value.
 ---@param spec any
@@ -78,14 +121,7 @@ end
 -- ----------------------------------------------------------------------------
 -- Exported API
 
----@type table<mongo.ui.status.ComponentType, mongo.ui.status.BuiltComponentInfo>
-M.components = {
-    _current_db = connection_comp.current_db,
-
-    _running_cnt = process_comp.running_cnt,
-    _process_state = process_comp.process_state,
-    _mongosh_last_output = process_comp.mongosh_last_output,
-}
+M.components = components
 
 M.set_status_line_dirty = status_base.set_status_line_dirty
 
