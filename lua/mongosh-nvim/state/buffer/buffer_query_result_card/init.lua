@@ -47,8 +47,12 @@ local function update_tree_view(mbuf, typed_json)
         tree_item.is_top_level = true
     end
 
-    local value = vim.json.decode(typed_json)
-    tree_item:update_binded_value(value)
+    local ok, value = xpcall(function()
+        return vim.json.decode(typed_json)
+    end, function()
+        log.warn "failed to decode JSON result"
+    end)
+    tree_item:update_binded_value(ok and value or {})
 
     local bo = vim.bo[bufnr]
     bo.modifiable = true
