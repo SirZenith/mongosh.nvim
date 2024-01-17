@@ -3,7 +3,7 @@ local api_core = require "mongosh-nvim.api.core"
 local api_buffer = require "mongosh-nvim.api.buffer"
 local mongosh_state = require "mongosh-nvim.state.mongosh"
 
-local ui_db_sidebar = require "mongosh-nvim.ui.ui_db_sidebar"
+local ui_db_sidebar = require "mongosh-nvim.ui.db_sidebar"
 
 local M = {}
 

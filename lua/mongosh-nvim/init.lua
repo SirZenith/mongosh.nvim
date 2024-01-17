@@ -1,6 +1,6 @@
-
 local config = require "mongosh-nvim.config"
 local log = require "mongosh-nvim.log"
+local status = require "mongosh-nvim.ui.status"
 
 local M = {}
 
@@ -37,6 +37,8 @@ function M.setup(options)
         log.warn("mongosh executable not found")
         config.executable = nil
     end
+
+    status.set_components(config.status_line.components)
 end
 
 return M

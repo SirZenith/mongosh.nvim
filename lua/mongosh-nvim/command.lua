@@ -111,7 +111,7 @@ cmd_util.new_cmd {
         api_core.set_connection_flags_by_table(raw_flags)
 
         -- try connecting
-        ---@type mongo.ConnectArgs
+        ---@type mongo.api.ConnectArgs
         local connect_args = {
             db_addr = args.db_addr,
 

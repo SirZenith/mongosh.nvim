@@ -1,3 +1,4 @@
+local api_constant = require "mongosh-nvim.constant.api"
 local config = require "mongosh-nvim.config"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
 local log = require "mongosh-nvim.log"
@@ -10,11 +11,10 @@ local loop = vim.loop
 
 local M = {}
 
-M.EventType = {
-    collection_list_update = "collection_list_update", -- fun(db: string)
-}
+local EventType = api_constant.CoreEventType
 
-M.emitter = event_util.EventEmitter:new("api.core", M.EventType)
+local emitter = event_util.EventEmitter:new("api.core", EventType)
+M.emitter = emitter
 
 -- Append flag-value pair to argument buffer list if the value is not `nil`.
 ---@param buffer string[]
@@ -65,24 +65,27 @@ function M.get_connection_args()
     return args
 end
 
----@class mongo.RunCmdResult
+---@class mongo.api.RunCmdResult
 ---@field code number
 ---@field signal number
 ---@field stdout string
 ---@field stderr string
 
----@class mongo.RunCmdArgs
+---@class mongo.api.RunCmdArgs
 ---@field args string[]
----@field callback fun(result: mongo.RunCmdResult) # callback for handling evaluation result.
+---@field callback fun(result: mongo.api.RunCmdResult) # callback for handling evaluation result.
 
----@class mongo.RunScriptArgs
+---@class mongo.api.RunScriptArgs
 ---@field script string # script snippet string.
 ---@field db_address? string # database address for connection.
----@field callback fun(result: mongo.RunCmdResult) # callback for handling evaluation result.
+---@field callback fun(result: mongo.api.RunCmdResult) # callback for handling evaluation result.
+---@field on_process_started? fun(handle?: userdata, pid: integer)
 
 -- Call mongosh executable with given arguments. Command will be evaluated
 -- asynchronously.
----@param args mongo.RunCmdArgs
+---@param args mongo.api.RunCmdArgs
+---@return userdata? handle
+---@return integer pid
 function M.call_mongosh(args)
     local executable = config.executable
     if not executable then
@@ -92,7 +95,7 @@ function M.call_mongosh(args)
             stdout = "",
             stderr = "mongosh executable not found"
         }
-        return
+        return nil, 0
     end
 
     local stdout = loop.new_pipe()
@@ -101,13 +104,15 @@ function M.call_mongosh(args)
     local out_buffer = {} ---@type string[]
     local err_buffer = {} ---@type string[]
 
-    loop.spawn(
+    local handle, pid
+    handle, pid = loop.spawn(
         executable,
         {
             args = args.args,
             stdio = { nil, stdout, stderr }
         },
         vim.schedule_wrap(function(code, signal)
+            emitter:emit(EventType.process_ended, pid)
             args.callback {
                 code = code,
                 signal = signal,
@@ -116,28 +121,45 @@ function M.call_mongosh(args)
             }
         end)
     )
+    emitter:emit(EventType.process_started, pid)
 
     loop.read_start(stdout, function(err, data)
         if err then return end
+
+        if data then
+            vim.schedule(function()
+                emitter:emit(EventType.incomming_stdout, pid, data)
+            end)
+        end
+
         out_buffer[#out_buffer + 1] = data
     end)
 
     loop.read_start(stderr, function(err, data)
         if err then return end
+
+        if data then
+            vim.schedule(function()
+                emitter:emit(EventType.incomming_stderr, pid, data)
+            end)
+        end
+
         err_buffer[#err_buffer + 1] = data
     end)
+
+    return handle, pid
 end
 
 -- Sends script snippet to last connected database collection if no database
 -- address is provided.
 -- **Note**: Script content is sent to mongosh via command line directly. If snippet is too
 -- long, this function might fail due to OS limitation.
----@param args mongo.RunScriptArgs
+---@param args mongo.api.RunScriptArgs
 function M.run_raw_script(args)
     local address = args.db_address or mongosh_state.get_db_addr()
     local exe_args = M.get_connection_args();
 
-    M.call_mongosh {
+    local handle, pid = M.call_mongosh {
         args = vim.list_extend(exe_args, {
             "--quiet",
             "--eval",
@@ -146,20 +168,25 @@ function M.run_raw_script(args)
         }),
         callback = args.callback,
     }
+
+    local on_process_started = args.on_process_started
+    if type(on_process_started) == "function" then
+        on_process_started(handle, pid)
+    end
 end
 
 -- Take script snippet and run it on last connected database collection if no
 -- database address is provide.
 -- Before running the snippet, function will first write it to temporary file,
 -- this is for avoiding limitation of maximum command line argument length.
----@param args mongo.RunScriptArgs
+---@param args mongo.api.RunScriptArgs
 function M.run_script(args)
     local address = args.db_address or mongosh_state.get_db_addr()
 
     M.save_tmp_script_file(args.script, function(tmpfile_name)
         local exe_args = M.get_connection_args()
 
-        M.call_mongosh {
+        local handle, pid = M.call_mongosh {
             args = vim.list_extend(exe_args, {
                 "--quiet",
                 address,
@@ -167,6 +194,11 @@ function M.run_script(args)
             }),
             callback = args.callback,
         }
+
+        local on_process_started = args.on_process_started
+        if type(on_process_started) == "function" then
+            on_process_started(handle, pid)
+        end
     end)
 end
 
@@ -212,7 +244,7 @@ function M.clear_connection_flags()
     mongosh_state.clear_all_raw_flags()
 end
 
----@class mongo.ConnectArgs
+---@class mongo.api.ConnectArgs
 ---@field db_addr? string
 --
 ---@field username? string
@@ -220,7 +252,7 @@ end
 ---@field auth_source? string
 
 -- Connect to give host, and query names of available database from it.
----@param args mongo.ConnectArgs
+---@param args mongo.api.ConnectArgs
 ---@param callback fun(err?: string)
 function M.connect(args, callback)
     local db_addr = args.db_addr or config.connection.default_db_addr
@@ -430,7 +462,7 @@ function M.update_collection_list(db, callback)
                 mongosh_state.set_collection_names(db, collections)
             end
 
-            M.emitter:emit(M.EventType.collection_list_update, db)
+            emitter:emit(EventType.collection_list_update, db)
             wrapped_callback(err)
         end,
     }

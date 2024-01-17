@@ -1,5 +1,6 @@
 local api_core = require "mongosh-nvim.api.core"
 local api_buffer = require "mongosh-nvim.api.buffer"
+local api_constant = require "mongosh-nvim.constant.api"
 local config = require "mongosh-nvim.config"
 local buffer_const = require "mongosh-nvim.constant.buffer"
 local hl_const = require "mongosh-nvim.constant.highlight"
@@ -8,8 +9,8 @@ local hl_util = require "mongosh-nvim.util.highlight"
 local api = vim.api
 
 local core_emitter = api_core.emitter
-local core_event = api_core.EventType
 
+local CoreEventType = api_constant.CoreEventType
 local HLGroup = hl_const.HighlightGroup
 
 local M = {}
@@ -201,7 +202,7 @@ function UIDBSidebar:register_events()
         end
     })
 
-    core_emitter:on(core_event.collection_list_update, self.on_collection_list_update, self)
+    core_emitter:on(CoreEventType.collection_list_update, self.on_collection_list_update, self)
 
     vim.keymap.set("n", "<Cr>", function()
         self:select_under_cursor()

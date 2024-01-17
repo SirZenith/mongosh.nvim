@@ -1,4 +1,7 @@
+local api_constant = require "mongosh-nvim.constant.api"
 local buffer_const = require "mongosh-nvim.constant.buffer"
+
+local ProcessState = api_constant.ProcessState
 
 local BufferType = buffer_const.BufferType
 local CreateBufferStyle = buffer_const.CreateBufferStyle
@@ -199,6 +202,49 @@ M = {
                 fold_all = "zM",
             }
         },
+    },
+
+    status_line = {
+        -- Listed components are enabled.
+        -- Values in this list can either be a string or a table.
+        --
+        -- If a value is string, it will be first treated as component name, and
+        -- corresponding custom component or built-in component will be loaded.
+        --
+        -- If no component matches that name, it will be added to status line
+        -- as raw string element.
+        --
+        -- Table values are treated as a component specification. With table
+        -- value at index 1 to be component name, the whole table will be used
+        -- as component argument, each time component function gets called.
+        --
+        -- For example, following specification enables component `_current_db`,
+        -- with `max_width` set to `20`:
+        -- ```lua
+        -- {
+        --     "_current_db",
+        --     max_width = 20,
+        -- }
+        -- ```
+        ---@type (mongo.ui.status.ComponentType | string | mongo.ui.status.ComponentSpec)[]
+        components = { "_current_db", " ", "_process_state", "_running_cnt" },
+
+        -- Provide your own component functions here, string key of that functoin
+        -- value can be used as component name in component list.
+        --
+        -- If a custom component has the same name as built in component, plugin
+        -- picks custom one.
+        --
+        -- Each compoent is a function that takes at most 1 argument, and returns
+        -- a value that can be convert to string by `tostring()`.
+        --
+        -- The only function argument comes from specification value in compoent
+        -- loading list. If a component is loaded with a table spec, that exact
+        -- table, will be the argument used to call component function.
+        --
+        -- Otherwise, component function will not receive argument.
+        ---@type table<string, mongo.ui.status.Component>
+        custom_components = {},
     },
 }
 

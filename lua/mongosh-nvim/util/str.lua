@@ -1,5 +1,8 @@
 M = {}
 
+local ELLIPSIS = "..."
+local ELLIPSIS_WIDTH = vim.fn.strdisplaywidth(ELLIPSIS)
+
 -- tirm white space on both ends of string.
 ---@param s string
 function M.trim(s)
@@ -81,6 +84,23 @@ function M.format_len(s, len, fill)
     end
 
     return s
+end
+
+-- Truncate message to max length in config, this function put `...` at the end
+-- of message if it gets truncated.
+-- For example with max length 5, `hello world` will be return as `he...`.
+---@param msg string
+---@return string
+function M.truncate_msg(msg, max_width)
+    local text_width = vim.fn.strdisplaywidth(msg)
+    if text_width < max_width then
+        return msg
+    end
+
+    local ed_pos = max_width - ELLIPSIS_WIDTH
+    local result = vim.fn.strcharpart(msg, 0, ed_pos) .. ELLIPSIS
+
+    return result
 end
 
 -- ----------------------------------------------------------------------------
