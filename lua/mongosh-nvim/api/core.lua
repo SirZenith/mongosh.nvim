@@ -277,6 +277,8 @@ function M.connect(args, callback)
             mongosh_state.reset_all_collection_name_cache()
 
             callback()
+
+            emitter:emit(EventType.connection_successed)
         end,
     }
 end
@@ -399,6 +401,20 @@ end
 ---@return string?
 function M.get_cur_db()
     return mongosh_state.get_db()
+end
+
+-- Return host name for current connection. If no connection have been made, then
+-- this function returns `nil`.
+---@return string?
+function M.get_cur_host()
+    return mongosh_state.get_host()
+end
+
+-- Return port number used in current connection. If no port is explictly
+-- specified, `nil` will be returned.
+---@return integer?
+function M.get_cur_port()
+    return mongosh_state.get_port()
 end
 
 -- Return names of available databases except ones that gets marked as ignored.

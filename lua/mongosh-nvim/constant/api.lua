@@ -19,6 +19,7 @@ M.ProcessState = {
 
 ---@enum mongo.api.CoreEventType
 M.CoreEventType = {
+    connection_successed = "connection_successed",     -- fun()
     collection_list_update = "collection_list_update", -- fun(db: string)
     db_selection_update = "db_selection_update",       -- fun(db: string)
     incomming_stdout = "incomming_stdout",             -- fun(pid: number, out: string)

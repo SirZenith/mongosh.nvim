@@ -14,6 +14,7 @@
 
 ---@alias mongo.ui.status.ComponentType
 ---| "_current_db"
+---| "_current_host"
 ---| "_running_cnt"
 ---| "_process_state"
 ---| "_mongosh_last_output"

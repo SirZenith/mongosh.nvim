@@ -33,6 +33,10 @@ local component_loader = {
         local connection_comp = require "mongosh-nvim.ui.status.component.connection"
         return connection_comp.current_db
     end,
+    _current_host = function()
+        local connection_comp = require "mongosh-nvim.ui.status.component.connection"
+        return connection_comp.current_host
+    end,
 
     _running_cnt = function()
         local process_comp = require "mongosh-nvim.ui.status.component.process"
