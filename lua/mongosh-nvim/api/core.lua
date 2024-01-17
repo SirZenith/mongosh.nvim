@@ -382,6 +382,7 @@ function M.switch_to_db(db)
         return "database is not available: " .. db
     end
 
+    emitter:emit(EventType.db_selection_update, db)
     mongosh_state.set_db(db)
 
     return nil

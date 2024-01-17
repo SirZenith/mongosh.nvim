@@ -1,7 +1,4 @@
-local api_constant = require "mongosh-nvim.constant.api"
 local buffer_const = require "mongosh-nvim.constant.buffer"
-
-local ProcessState = api_constant.ProcessState
 
 local BufferType = buffer_const.BufferType
 local CreateBufferStyle = buffer_const.CreateBufferStyle

@@ -1,7 +1,5 @@
 local api_core = require "mongosh-nvim.api.core"
 local api_constant = require "mongosh-nvim.constant.api"
-local config = require "mongosh-nvim.config"
-local log = require "mongosh-nvim.log"
 local str_util = require "mongosh-nvim.util.str"
 
 local status_base = require "mongosh-nvim.ui.status.base"
@@ -9,6 +7,7 @@ local status_base = require "mongosh-nvim.ui.status.base"
 local CoreEventType = api_constant.CoreEventType
 local ProcessType = api_constant.ProcessType
 local ProcessState = api_constant.ProcessState
+
 local core_event = api_core.emitter
 
 local M = {}
@@ -142,7 +141,7 @@ M.mongosh_last_output = {
 -- ----------------------------------------------------------------------------
 
 ---@type table<mongo.api.CoreEventType, function>
-local event_map = {
+status_base.register_status_line_events(core_event, {
     ---@type fun(pid: integer)
     [CoreEventType.process_started] = function(pid)
         running_cnt = running_cnt + 1
@@ -183,13 +182,6 @@ local event_map = {
         local meta = get_or_create_process_meta(pid)
         meta.type = type
     end,
-}
-
-for event, handler in pairs(event_map) do
-    core_event:on(event, function(...)
-        status_base.set_status_line_dirty()
-        handler(...)
-    end)
-end
+})
 
 return M
