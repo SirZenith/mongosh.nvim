@@ -112,13 +112,13 @@ function M.call_mongosh(args)
             stdio = { nil, stdout, stderr }
         },
         vim.schedule_wrap(function(code, signal)
-            emitter:emit(EventType.process_ended, pid)
             args.callback {
                 code = code,
                 signal = signal,
                 stdout = table.concat(out_buffer),
                 stderr = table.concat(err_buffer),
             }
+            emitter:emit(EventType.process_ended, pid)
         end)
     )
     emitter:emit(EventType.process_started, pid)
@@ -126,25 +126,25 @@ function M.call_mongosh(args)
     loop.read_start(stdout, function(err, data)
         if err then return end
 
+        out_buffer[#out_buffer + 1] = data
+
         if data then
             vim.schedule(function()
                 emitter:emit(EventType.incomming_stdout, pid, data)
             end)
         end
-
-        out_buffer[#out_buffer + 1] = data
     end)
 
     loop.read_start(stderr, function(err, data)
         if err then return end
+
+        err_buffer[#err_buffer + 1] = data
 
         if data then
             vim.schedule(function()
                 emitter:emit(EventType.incomming_stderr, pid, data)
             end)
         end
-
-        err_buffer[#err_buffer + 1] = data
     end)
 
     return handle, pid
@@ -384,8 +384,8 @@ function M.switch_to_db(db)
         return "database is not available: " .. db
     end
 
-    emitter:emit(EventType.db_selection_update, db)
     mongosh_state.set_db(db)
+    emitter:emit(EventType.db_selection_update, db)
 
     return nil
 end
@@ -479,8 +479,8 @@ function M.update_collection_list(db, callback)
                 mongosh_state.set_collection_names(db, collections)
             end
 
-            emitter:emit(EventType.collection_list_update, db)
             wrapped_callback(err)
+            emitter:emit(EventType.collection_list_update, db)
         end,
     }
 end
