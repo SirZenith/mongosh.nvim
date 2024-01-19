@@ -22,10 +22,12 @@ local M = {}
 -- ----------------------------------------------------------------------------
 -- Component Loading
 
+-- Status line state cache
+local last_active_state = nil ---@type boolean?
 ---@type (mongo.ui.status.Component | string)[]
-local active_components = {}
+local selected_components = {}
 ---@type (table | true)[]
-local active_component_args = {}
+local selected_component_args = {}
 
 ---@alias mongo.ui.status.ComponentType
 ---| "_current_db"
@@ -132,8 +134,8 @@ local function load_component_by_spec(spec)
         return "invalid component '" .. tostring(spec) .. "'"
     end
 
-    active_components[#active_components + 1] = comp
-    active_component_args[#active_component_args + 1] = args
+    selected_components[#selected_components + 1] = comp
+    selected_component_args[#selected_component_args + 1] = args
 end
 
 -- ----------------------------------------------------------------------------
@@ -146,8 +148,8 @@ M.set_status_line_dirty = status_base.set_status_line_dirty
 -- Set active components with a list of component name.
 ---@param comp_values (string | table)[]
 function M.set_components(comp_values)
-    active_components = {}
-    active_component_args = {}
+    selected_components = {}
+    selected_component_args = {}
 
     local len = #comp_values
     for i = 1, len do
@@ -160,12 +162,25 @@ function M.set_components(comp_values)
     end
 end
 
+-- Update state cache of status line.
+---@param is_active boolean
+function M.set_active_state(is_active)
+    if is_active == last_active_state then return end
+
+    last_active_state  = is_active
+    status_base.set_status_line_dirty()
+
+    local comp_cfg = config.status_line.components
+    local comps = is_active and comp_cfg.active or comp_cfg.inactive
+    M.set_components(comps)
+end
+
 -- Generate status line text.
 ---@return string
 function M.get_status_line()
     local buffer = {}
-    for i, comp in ipairs(active_components) do
-        local args = active_component_args[i]
+    for i, comp in ipairs(selected_components) do
+        local args = selected_component_args[i]
 
         local value
         if type(comp) ~= "function" then
@@ -186,8 +201,11 @@ end
 
 -- Generate status line text, prefere using cached line if not specified.
 ---@param _ table # lualine module table.
+---@param is_active boolean
 ---@return string
-function M.status(_)
+function M.status(_, is_active)
+    M.set_active_state(is_active)
+
     local cached = status_base.get_cached_status_line()
     if cached then
         return cached

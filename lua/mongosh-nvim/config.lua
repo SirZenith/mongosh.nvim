@@ -202,6 +202,9 @@ M = {
     },
 
     status_line = {
+        -- `inactive` and `active` are components used in inactive status line
+        -- and active status line respectively.
+        --
         -- Listed components are enabled.
         -- Values in this list can either be a string or a table.
         --
@@ -223,8 +226,13 @@ M = {
         --     max_width = 20,
         -- }
         -- ```
-        ---@type (mongo.ui.status.ComponentType | string | mongo.ui.status.ComponentSpec)[]
-        components = { "_current_host", "/", "_current_db", " ", "_operation_state", "_running_cnt" },
+        components = {
+            ---@type (mongo.ui.status.ComponentType | string | mongo.ui.status.ComponentSpec)[]
+            active = { "_current_host", "/", "_current_db", " ", "_operation_state", "_running_cnt" },
+
+            ---@type (mongo.ui.status.ComponentType | string | mongo.ui.status.ComponentSpec)[]
+            inactive = { "_current_db", " ", "_operation_state" },
+        },
 
         -- Provide your own component functions here, string key of that functoin
         -- value can be used as component name in component list.
