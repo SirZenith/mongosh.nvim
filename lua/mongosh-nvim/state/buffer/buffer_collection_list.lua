@@ -5,6 +5,7 @@ local buffer_util = require "mongosh-nvim.util.buffer"
 local api = vim.api
 
 local BufferType = buffer_const.BufferType
+local FileType = buffer_const.FileType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
@@ -18,6 +19,7 @@ function M.on_enter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
+    bo.filetype = FileType.CollectionList
 
     -- press <Cr> to select a collection
     vim.keymap.set("n", "<CR>", function()

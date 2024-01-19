@@ -5,6 +5,7 @@ local buffer_util = require "mongosh-nvim.util.buffer"
 local ts_util = require "mongosh-nvim.util.tree_sitter"
 
 local BufferType = buffer_const.BufferType
+local FileType = buffer_const.FileType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
@@ -18,7 +19,7 @@ function M.on_enter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
-    bo.filetype = "json"
+    bo.filetype = "json." .. FileType.QueryResult
 end
 
 function M.on_leave(mbuf)

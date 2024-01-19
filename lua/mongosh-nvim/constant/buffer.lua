@@ -1,6 +1,6 @@
 local M = {}
 
----@enum mongo.BufferType
+---@enum mongo.buffer.BufferType
 M.BufferType = {
     Unknown = "unknown",
     DbList = "db_list",
@@ -16,29 +16,45 @@ M.BufferType = {
     UpdateResult = "update_result",
 }
 
----@enum mongo.ResultSplitStyle
+---@enum mongo.buffer.FileType
+M.FileType = {
+    Unknown = "MongoshNvimUnknown",
+    DbList = "MongoshNvimDbList",
+    CollectionList = "MongoshNvimCollectionList",
+    Execute = "MongoshNvimExecute",
+    ExecuteResult = "MongoshNvimExecuteResult",
+    Query = "MongoshNvimQuery",
+    QueryResult = "MongoshNvimQueryResult",
+    QueryResultCard = "MongoshNvimQueryResultCard",
+    Edit = "MongoshNvimEdit",
+    EditResult = "MongoshNvimEditResult",
+    Update = "MongoshNvimUpdate",
+    UpdateResult = "MongoshNvimUpdateResult",
+}
+
+---@enum mongo.buffer.ResultSplitStyle
 M.ResultSplitStyle = {
     Tab = "tab",
     Horizontal = "horizontal",
     Vertical = "vertical",
 }
 
----@enum mongo.CreateBufferStyle
+---@enum mongo.buffer.CreateBufferStyle
 M.CreateBufferStyle = {
     Always = "always",
     OnNeed = "on_need",
     Never = "never",
 }
 
----@enum mongo.QueryResultStyle
+---@enum mongo.buffer.QueryResultStyle
 M.QueryResultStyle = {
     JSON = "json",
     Card = "card",
 }
 
-M.DB_SIDEBAR_FILETYPE = "mongosh-nvim-db-sidebar"
+M.DB_SIDEBAR_FILETYPE = "MongoshNvimDBSideBar"
 
----@enum mongo.TreeEntryNestingType
+---@enum mongo.buffer.TreeEntryNestingType
 M.TreeEntryNestingType = {
     Object = "object",
     Array = "array",
@@ -46,7 +62,7 @@ M.TreeEntryNestingType = {
     None = "none",
 }
 
----@enum mongo.BSONValueType
+---@enum mongo.buffer.BSONValueType
 M.BSONValueType = {
     -- ------------------------------------------------------------------------
     -- plain value

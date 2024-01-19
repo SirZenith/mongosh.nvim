@@ -16,7 +16,7 @@ local function check_db_selected()
     return api_core.get_cur_db() ~= nil
 end
 
----@param supported_types mongo.BufferType[]
+---@param supported_types mongo.buffer.BufferType[]
 ---@return fun(): boolean available_checker
 local function buffer_type_checker(supported_types)
     local type_set = {}

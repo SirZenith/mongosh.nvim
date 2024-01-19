@@ -18,7 +18,7 @@ local M = {}
 -- ----------------------------------------------------------------------------
 
 -- map result buffer creation sytle to buffer maker function
----@type table<mongo.CreateBufferStyle, fun(mbuf: mongo.MongoBuffer): integer>
+---@type table<mongo.buffer.CreateBufferStyle, fun(mbuf: mongo.MongoBuffer): integer>
 local result_buffer_getter_map = {
     -- No matter whether old buffer exists or not, a new buffer will be created.
     [CreateBufferStyle.Always] = function()
@@ -50,7 +50,7 @@ local result_buffer_getter_map = {
 }
 
 -- map result window creation style to window maker function
----@type table<mongo.ResultSplitStyle, fun(bufnr: integer): integer>
+---@type table<mongo.buffer.ResultSplitStyle, fun(bufnr: integer): integer>
 local result_win_maker_map = {
     [ResultSplitStyle.Horizontal] = function(bufnr)
         local win = buffer_util.get_win_by_buf(bufnr, true)
@@ -79,7 +79,7 @@ local result_win_maker_map = {
 }
 
 -- Return result window number according to split style.
----@param split_style mongo.ResultSplitStyle
+---@param split_style mongo.buffer.ResultSplitStyle
 ---@param bufnr integer
 local function make_result_win(split_style, bufnr)
     local maker = result_win_maker_map[split_style] or result_win_maker_map[FALLBACK_RESULT_SPLIT_STYLE]
@@ -90,7 +90,7 @@ end
 -- ----------------------------------------------------------------------------
 
 ---@class mongo.BufferResultArgs
----@field type mongo.BufferType
+---@field type mongo.buffer.BufferType
 ---@field state_args? table<string, any>
 
 ---@class mongo.MongoBufferOperationModule
@@ -103,7 +103,7 @@ end
 ---@field refresher? fun(mbuf: mongo.MongoBuffer, callback: fun(err?: string))
 ---@field convert_type? fun(mbuf: mongo.MongoBuffer, args: table<string, any>, callback: fun(err?: string))
 
----@type table<mongo.BufferType, mongo.MongoBufferOperationModule>
+---@type table<mongo.buffer.BufferType, mongo.MongoBufferOperationModule>
 local OPERATION_MAP = {
     [BufferType.Unknown] = require "mongosh-nvim.state.buffer.buffer_unknown",
     [BufferType.DbList] = require "mongosh-nvim.state.buffer.buffer_db_list",
@@ -125,7 +125,7 @@ local FALLBACK_OP_MODEL = OPERATION_MAP[FALLBACK_BUFFER_TYPE]
 
 ---@class mongo.MongoBuffer : mongo.MongoBufferOperationModule
 --
----@field _type mongo.BufferType
+---@field _type mongo.buffer.BufferType
 ---@field _is_user_buffer boolean # Whether this buffer is created by user
 --
 ---@field _bufnr integer # buffer number of this buffer.
@@ -137,8 +137,8 @@ local FALLBACK_OP_MODEL = OPERATION_MAP[FALLBACK_BUFFER_TYPE]
 ---@field _result_bufnr? integer # result buffer used to display executation result of this buffer.
 ---@field _state_args table<string, any> # state values bind with this buffer.
 --
----@field create_buffer_style mongo.CreateBufferStyle
----@field create_win_style mongo.ResultSplitStyle
+---@field create_buffer_style mongo.buffer.CreateBufferStyle
+---@field create_win_style mongo.buffer.ResultSplitStyle
 local MongoBuffer = {}
 MongoBuffer._instance_map = {}
 
@@ -162,7 +162,7 @@ function MongoBuffer.get_buffer_obj(bufnr)
 end
 
 ---@class mongo.MongoBufferCreateArgs
----@field type mongo.BufferType
+---@field type mongo.buffer.BufferType
 ---@field src_bufnr? integer
 ---@field result_bufnr? integer
 ---@field bufnr? integer
@@ -206,7 +206,7 @@ end
 -- With content binded with this buffer object, it can still make `write_result`
 -- call, etc.
 -- Dummy buffer objects are not registered to global mongo buffer map.
----@param type mongo.BufferType
+---@param type mongo.buffer.BufferType
 ---@param lines string[]
 ---@return mongo.MongoBuffer
 function MongoBuffer:new_dummy(type, lines)
@@ -313,7 +313,7 @@ function MongoBuffer:get_bufnr()
     return bufnr
 end
 
----@param split_style? mongo.ResultSplitStyle
+---@param split_style? mongo.buffer.ResultSplitStyle
 ---@param win? integer # if not `nil`, buffer will be displayed in given window.
 function MongoBuffer:show(split_style, win)
     local bufnr = self:get_bufnr()
@@ -338,7 +338,7 @@ function MongoBuffer:get_type()
 end
 
 -- change_type_to switches buffer type to given `type`.
----@param type mongo.BufferType
+---@param type mongo.buffer.BufferType
 function MongoBuffer:change_type_to(type)
     if type == self._type then return end
 
@@ -426,7 +426,7 @@ function MongoBuffer:make_result_buffer()
 end
 
 -- make_result_buffer_obj creates a mongo buffer object for writing result.
----@param type mongo.BufferType
+---@param type mongo.buffer.BufferType
 ---@param bufnr? integer
 ---@return string? err
 ---@return mongo.MongoBuffer?
@@ -518,7 +518,7 @@ end
 -- ----------------------------------------------------------------------------
 
 -- Make a new mongo buffer without showing it on screen.
----@param type mongo.BufferType
+---@param type mongo.buffer.BufferType
 ---@param lines string[]
 ---@return mongo.MongoBuffer
 function M.create_mongo_buffer(type, lines)
@@ -530,7 +530,7 @@ function M.create_mongo_buffer(type, lines)
 end
 
 -- Make a new dummy mongo buffer with given content.
----@param type mongo.BufferType
+---@param type mongo.buffer.BufferType
 ---@param lines string[]
 ---@return mongo.MongoBuffer
 function M.create_dummy_mongo_buffer(type, lines)
@@ -538,7 +538,7 @@ function M.create_dummy_mongo_buffer(type, lines)
 end
 
 -- Create a MongoBuffer object for given buffer.
----@param type mongo.BufferType
+---@param type mongo.buffer.BufferType
 ---@param bufnr integer
 ---@return mongo.MongoBuffer
 function M.wrap_with_mongo_buffer(type, bufnr)

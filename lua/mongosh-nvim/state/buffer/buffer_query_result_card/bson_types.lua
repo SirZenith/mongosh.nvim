@@ -38,7 +38,7 @@ local function int_value_serialize(value, int_key, float_key)
     return nil, ("{ %s: %q }"):format(key, value)
 end
 
----@type table<mongo.BSONValueType, mongo.buffer.ValueTypeMeta>
+---@type table<mongo.buffer.BSONValueType, mongo.buffer.ValueTypeMeta>
 M.VALUE_TYPE_NAME_MAP = {
     -- ------------------------------------------------------------------------
     -- plain value
@@ -313,7 +313,7 @@ for _, meta in pairs(M.VALUE_TYPE_NAME_MAP) do
     end
 end
 
----@type table<string, mongo.BSONValueType>
+---@type table<string, mongo.buffer.BSONValueType>
 M.COMPOSED_TYPE_IDENT_KEY = {
     ["$binary"] = ValueType.Binary,
     ["$code"] = ValueType.Code,

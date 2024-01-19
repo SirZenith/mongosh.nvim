@@ -33,13 +33,13 @@ M = {
     dialog = {
         -- When a snippe buffer for query, editing, etc. needs to be shown, how
         -- this plugin would create a window for it.
-        ---@type mongo.ResultSplitStyle
+        ---@type mongo.buffer.ResultSplitStyle
         split_style = ResultSplitStyle.Tab,
 
         -- Map for function to be call when a mongo buffer of certain type is
         -- created.
         -- This can be used to create custom keymap in new buffer.
-        ---@type table<mongo.BufferType, fun(bufnr: integer)>
+        ---@type table<mongo.buffer.BufferType, fun(bufnr: integer)>
         on_create = {
             -- fallback operation for all buffer type with no on-create function.
             [BufferType.Unknown] = function(bufnr)
@@ -77,13 +77,13 @@ M = {
     result_buffer = {
         -- How this plugin would create a new result window.
         -- This will be default value for new buffer.
-        ---@type mongo.ResultSplitStyle
+        ---@type mongo.buffer.ResultSplitStyle
         split_style = ResultSplitStyle.Vertical,
 
         -- Type-wise result window split style setting. Mongo buffers prefers
         -- using value in this map to do initialization if style for its type is
         -- found here.
-        ---@type table<mongo.ResultSplitStyle, mongo.ResultSplitStyle>
+        ---@type table<mongo.buffer.ResultSplitStyle, mongo.buffer.ResultSplitStyle>
         split_style_type_map = {
             [BufferType.QueryResult] = ResultSplitStyle.Tab,
             [BufferType.QueryResultCard] = ResultSplitStyle.Tab,
@@ -91,13 +91,13 @@ M = {
 
         -- When this plugin should create a new result buffer.
         -- This will be default value for new buffer.
-        ---@type mongo.CreateBufferStyle
+        ---@type mongo.buffer.CreateBufferStyle
         create_buffer_style = CreateBufferStyle.OnNeed,
 
         -- Type-wise result buffer creation strategy. Mongo bufferrs prefers
         -- using value in this map to do initialization if style for its type is
         -- found here
-        ---@type table<mongo.BufferType, mongo.CreateBufferStyle>
+        ---@type table<mongo.buffer.BufferType, mongo.buffer.CreateBufferStyle>
         create_buffer_style_type_map = {},
     },
 
@@ -107,7 +107,7 @@ M = {
         use_typed_query = false,
 
         -- What style of view should be used to display query result.
-        ---@type mongo.QueryResultStyle
+        ---@type mongo.buffer.QueryResultStyle
         result_style = QueryResultStyle.JSON,
     },
 

@@ -1,8 +1,23 @@
 local api_core = require "mongosh-nvim.api.core"
+local buffer_const = require "mongosh-nvim.constant.buffer"
 local util = require "mongosh-nvim.util"
+
+local FileType = buffer_const.FileType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
+
+function M.on_enter(mbuf)
+    local bufnr = mbuf:get_bufnr()
+    if not bufnr then return end
+
+    local bo = vim.bo[bufnr]
+
+    bo.bufhidden = "delete"
+    bo.buflisted = false
+    bo.buftype = "nofile"
+    bo.filetype = FileType.ExecuteResult
+end
 
 function M.content_writer(mbuf, callback)
     local src_lines = mbuf:get_src_buf_lines()

@@ -1,4 +1,7 @@
 local api_core = require "mongosh-nvim.api.core"
+local buffer_const = require "mongosh-nvim.constant.buffer"
+
+local FileType = buffer_const.FileType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
@@ -12,8 +15,7 @@ function M.on_enter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
-
-    bo.filetype = "json"
+    bo.filetype = "json." .. FileType.UpdateResult
 end
 
 function M.on_leave(mbuf)

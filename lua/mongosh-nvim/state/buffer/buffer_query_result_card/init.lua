@@ -7,6 +7,7 @@ local util = require "mongosh-nvim.util"
 local TreeViewItem = require "mongosh-nvim.state.buffer.buffer_query_result_card.tree_view_item"
 
 local BufferType = buffer_const.BufferType
+local FileType = buffer_const.FileType
 
 -- ----------------------------------------------------------------------------
 
@@ -227,6 +228,7 @@ function M.on_enter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
+    bo.filetype = FileType.QueryResultCard
     bo.modifiable = false
 
     set_up_buffer_keybinding(mbuf)

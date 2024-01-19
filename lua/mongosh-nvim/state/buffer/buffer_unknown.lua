@@ -1,4 +1,7 @@
+local buffer_const = require "mongosh-nvim.constant.buffer"
 local log = require "mongosh-nvim.log"
+
+local FileType = buffer_const.FileType
 
 ---@type mongo.MongoBufferOperationModule
 local M = {}
@@ -12,6 +15,7 @@ function M.on_enter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
+    bo.filetype = FileType.Unknown
 end
 
 function M.on_leave(mbuf)

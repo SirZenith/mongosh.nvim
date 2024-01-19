@@ -64,7 +64,7 @@ end
 --
 ---@field is_top_level boolean # whether current item is tree view root
 ---@field children? table<number | string, mongo.buffer.TreeViewItem>
----@field child_table_type mongo.TreeEntryNestingType
+---@field child_table_type mongo.buffer.TreeEntryNestingType
 ---@field parent? mongo.buffer.TreeViewItem
 --
 ---@field expanded boolean
@@ -285,7 +285,7 @@ function TreeViewItem:fold_all()
     return self:set_folding_level(max_sibling_depth)
 end
 
----@return mongo.TreeEntryNestingType
+---@return mongo.buffer.TreeEntryNestingType
 function TreeViewItem:get_nested_table_type()
     local children = self.children
     if not children then return NestingType.None end

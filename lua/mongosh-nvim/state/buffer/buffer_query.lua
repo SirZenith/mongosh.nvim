@@ -5,6 +5,7 @@ local str_util = require "mongosh-nvim.util.str"
 local extract = require "mongosh-nvim.util.tree_sitter.query_collection_extraction"
 
 local BufferType = buffer_const.BufferType
+local FileType = buffer_const.FileType
 local QueryResultStyle = buffer_const.QueryResultStyle
 
 ---@type mongo.MongoBufferOperationModule
@@ -19,7 +20,7 @@ function M.on_enter(mbuf)
     bo.bufhidden = "delete"
     bo.buflisted = false
     bo.buftype = "nofile"
-    bo.filetype = "typescript"
+    bo.filetype = "typescript." .. FileType.Query
 end
 
 function M.on_leave(mbuf)
