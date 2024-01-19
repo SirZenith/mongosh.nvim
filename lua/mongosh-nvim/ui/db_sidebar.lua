@@ -209,6 +209,7 @@ function UIDBSidebar:new()
 end
 
 function UIDBSidebar:init_events()
+    core_emitter:on(CoreEventType.action_connect_end, self.on_action_connect_end, self)
     core_emitter:on(CoreEventType.collection_list_update, self.on_collection_list_update, self)
 end
 
@@ -362,6 +363,12 @@ function UIDBSidebar:is_valid_in_tabpage(tabpage)
     local winnr = info and info.winnr
 
     return winnr ~= nil and api.nvim_win_is_valid(winnr)
+end
+
+function UIDBSidebar:on_action_connect_end()
+    local db_names = api_core.get_filtered_db_list()
+    self:update_databases(db_names)
+    self:write_to_buffer()
 end
 
 ---@param db string
