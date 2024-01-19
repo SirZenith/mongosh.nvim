@@ -5,7 +5,7 @@ local ts = vim.treesitter
 
 local M = {}
 
----@type table<string, mongo.TSVisitorFunc>
+---@type table<string, mongo.treesitter.VisitorFunc>
 local visitor_map = {
     program = function(context, node)
         local query = query_typescript.QUERY_DECLARATION_RESULT

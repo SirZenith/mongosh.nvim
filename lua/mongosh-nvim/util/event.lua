@@ -4,22 +4,22 @@ local M = {}
 
 -- ----------------------------------------------------------------------------
 
----@alias mongo.util.EventCallbackSet table<function, boolean>
+---@alias mongo.event.CallbackSet table<function, boolean>
 
----@class mongo.util.EventChannel
----@field free_callback mongo.util.EventCallbackSet # callback function set
----@field binded_callback table<table, mongo.util.EventCallbackSet> # mapping `self` table to event callback
+---@class mongo.event.Channel
+---@field free_callback mongo.event.CallbackSet # callback function set
+---@field binded_callback table<table, mongo.event.CallbackSet> # mapping `self` table to event callback
 
----@class mongo.util.EventEmitter
+---@class mongo.event.Emitter
 ---@field name string
 ---@field event_type_set table<string, boolean>
----@field _channels table<string, mongo.util.EventChannel> # map event type to listener list.
+---@field _channels table<string, mongo.event.Channel> # map event type to listener list.
 local EventEmitter = {}
 EventEmitter.__index = EventEmitter
 
 ---@param name string
 ---@param type_tbl table<string, string> # event type enum table
----@return mongo.util.EventEmitter
+---@return mongo.event.Emitter
 function EventEmitter:new(name, type_tbl)
     local obj = setmetatable({}, self)
 
@@ -39,7 +39,7 @@ end
 -- Gets channel of `event_type`, if such channel doesn't exists yet,
 -- a new channel will be created.
 ---@param event_type string
----@return mongo.util.EventChannel
+---@return mongo.event.Channel
 function EventEmitter:_get_channel(event_type)
     local channels = self._channels
 

@@ -7,7 +7,7 @@ local ts_util = require "mongosh-nvim.util.tree_sitter"
 local BufferType = buffer_const.BufferType
 local FileType = buffer_const.FileType
 
----@type mongo.MongoBufferOperationModule
+---@type mongo.buffer.MongoBufferOperationModule
 local M = {}
 
 function M.on_enter(mbuf)

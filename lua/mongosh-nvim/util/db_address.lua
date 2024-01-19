@@ -2,7 +2,7 @@ local str_util = require "mongosh-nvim.util.str"
 
 local M = {}
 
----@class mongo.DbAddressData
+---@class mongo.util.DbAddressData
 ---@field _protocol? string
 ---@field _host? string
 ---@field _port? number
@@ -13,7 +13,7 @@ DbAddressData.__index = DbAddressData
 M.DbAddressData = DbAddressData
 
 -- new creates a new database address object.
----@return mongo.DbAddressData
+---@return mongo.util.DbAddressData
 function DbAddressData:new()
     local obj = setmetatable({}, self)
     return obj

@@ -75,12 +75,12 @@ end
 
 -- ----------------------------------------------------------------------------
 
----@class mongo.ExecuteBufferArgs
+---@class mongo.api.ExecuteBufferArgs
 ---@field with_range boolean
 
 -- Execute snippet in given buffer.
 ---@param bufnr integer
----@param args mongo.ExecuteBufferArgs
+---@param args mongo.api.ExecuteBufferArgs
 function M.run_buffer_executation(bufnr, args)
     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
         or buffer_state.wrap_with_mongo_buffer(BufferType.Execute, bufnr)
@@ -101,18 +101,18 @@ end
 
 -- Execute given snippet and show result in buffer.
 ---@param lines string[]
----@param args mongo.ExecuteBufferArgs
+---@param args mongo.api.ExecuteBufferArgs
 function M.run_executation_lines(lines, args)
     local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.Execute, lines)
     mbuf:write_result(args)
 end
 
----@class mongo.RunBufferQueryArgs
+---@class mongo.api.RunBufferQueryArgs
 ---@field with_range boolean
 
 -- Run query snippet in given buffer.
 ---@param bufnr integer
----@param args mongo.RunBufferQueryArgs
+---@param args mongo.api.RunBufferQueryArgs
 function M.run_buffer_query(bufnr, args)
     local mbuf = buffer_state.try_get_mongo_buffer(bufnr)
         or buffer_state.wrap_with_mongo_buffer(BufferType.Query, bufnr)
@@ -135,18 +135,18 @@ end
 
 -- Run given query and show result in buffer.
 ---@param lines string[]
----@param args mongo.RunBufferQueryArgs
+---@param args mongo.api.RunBufferQueryArgs
 function M.run_query_lines(lines, args)
     local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.Query, lines)
     mbuf:write_result(args)
 end
 
----@class mongo.RunBufferEditArgs
+---@class mongo.api.RunBufferEditArgs
 ---@field with_range boolean
 
 -- Run replace snippet in given buffer
 ---@param bufnr integer
----@param args mongo.RunBufferEditArgs
+---@param args mongo.api.RunBufferEditArgs
 function M.run_buffer_edit(bufnr, args)
     local db = api_core.get_cur_db()
     if not db then
@@ -176,7 +176,7 @@ end
 
 -- Run given replace snippet and show result in buffer.
 ---@param lines string[]
----@param args mongo.RunBufferEditArgs
+---@param args mongo.api.RunBufferEditArgs
 function M.run_edit_lines(lines, args)
     local mbuf = buffer_state.create_dummy_mongo_buffer(BufferType.Edit, lines)
     mbuf:write_result(args)

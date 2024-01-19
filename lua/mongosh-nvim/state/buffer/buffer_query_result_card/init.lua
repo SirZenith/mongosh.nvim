@@ -11,7 +11,7 @@ local FileType = buffer_const.FileType
 
 -- ----------------------------------------------------------------------------
 
----@type mongo.MongoBufferOperationModule
+---@type mongo.buffer.MongoBufferOperationModule
 local M = {}
 
 ---@param bufnr integer
@@ -23,7 +23,7 @@ local function update_tree_to_buffer(bufnr, tree_item)
     bo.modifiable = false
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 ---@return integer? bufnr
 ---@return mongo.buffer.TreeViewItem?
 local function try_get_tree_item(mbuf)
@@ -35,7 +35,7 @@ local function try_get_tree_item(mbuf)
     return bufnr, tree_item
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 local function update_tree_view(mbuf, typed_json)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -61,7 +61,7 @@ local function update_tree_view(mbuf, typed_json)
     bo.modifiable = false
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 local function toggle_entry_expansion(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -75,7 +75,7 @@ local function toggle_entry_expansion(mbuf)
     bo.modifiable = false
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 local function try_edit_field(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -109,7 +109,7 @@ local function try_edit_field(mbuf)
     }
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 ---@param offset integer
 local function chnage_foldingy_level(mbuf, offset)
     local bufnr, tree_item = try_get_tree_item(mbuf)
@@ -124,7 +124,7 @@ local function chnage_foldingy_level(mbuf, offset)
     end
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 local function fold_all(mbuf)
     local bufnr, tree_item = try_get_tree_item(mbuf)
     if not bufnr or not tree_item then
@@ -136,7 +136,7 @@ local function fold_all(mbuf)
     end
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 local function expand_all(mbuf)
     local bufnr, tree_item = try_get_tree_item(mbuf)
     if not bufnr or not tree_item then
@@ -148,7 +148,7 @@ local function expand_all(mbuf)
     end
 end
 
----@param mbuf mongo.MongoBuffer
+---@param mbuf mongo.buffe.MongoBuffer
 local function set_up_buffer_keybinding(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end

@@ -6,12 +6,34 @@ local status_base = require "mongosh-nvim.ui.status.base"
 local M = {}
 
 -- ----------------------------------------------------------------------------
+
+---@alias mongo.ui.status.Component fun(args?: table): string
+
+---@class mongo.ui.status.ComponentSpec
+---@field [integer] string
+---@field [string] any
+
+---@class mongo.ui.status.BuiltComponentInfo
+---@field default_args table<string, any>
+---@field comp mongo.ui.status.Component
+
+---@alias mongo.ui.status.ComponentLoaderFunc fun(): mongo.ui.status.BuiltComponentInfo
+
+-- ----------------------------------------------------------------------------
 -- Component Loading
 
 ---@type (mongo.ui.status.Component | string)[]
 local active_components = {}
 ---@type (table | true)[]
 local active_component_args = {}
+
+---@alias mongo.ui.status.ComponentType
+---| "_current_db"
+---| "_current_host"
+---| "_running_cnt"
+---| "_process_state"
+---| "_mongosh_last_output"
+---| "_operation_state"
 
 -- Components are loaded on need, so that unnecessary events won't be registered.
 ---@type table<mongo.ui.status.ComponentType, mongo.ui.status.ComponentLoaderFunc>

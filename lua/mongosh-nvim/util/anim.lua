@@ -1,6 +1,6 @@
 local M = {}
 
----@class mongo.util.CharAnimation
+---@class mongo.anim.CharAnimation
 ---@field frame_time integer
 ---@field _frames? string[]
 ---@field _frame_cnt integer
@@ -10,7 +10,7 @@ local M = {}
 local CharAnimation = {}
 CharAnimation.__index = CharAnimation
 
----@return mongo.util.CharAnimation
+---@return mongo.anim.CharAnimation
 function CharAnimation:new()
     local obj = setmetatable({}, self)
 

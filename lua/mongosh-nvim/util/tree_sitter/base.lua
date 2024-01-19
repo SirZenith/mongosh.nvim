@@ -13,15 +13,15 @@ function M.caps_to_table(query, captures)
     return tbl
 end
 
----@alias mongo.TSVisitorFunc fun(contex: mongo.TSWalkThroughContext, node: TSNode): string?
+---@alias mongo.treesitter.VisitorFunc fun(contex: mongo.treesitter.WalkThroughContext, node: TSNode): string?
 
----@class mongo.TSWalkThroughContext
+---@class mongo.treesitter.WalkThroughContext
 ---@field root TSNode
 ---@field src string
----@field visitor_map table<string, mongo.TSVisitorFunc>
+---@field visitor_map table<string, mongo.treesitter.VisitorFunc>
 ---@field visited? table<string, boolean>
 
----@param contex mongo.TSWalkThroughContext
+---@param contex mongo.treesitter.WalkThroughContext
 ---@return string?
 function M.walk_through_node(contex, node)
     local type = node:type()

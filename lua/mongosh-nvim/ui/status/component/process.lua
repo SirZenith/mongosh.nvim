@@ -12,6 +12,16 @@ local core_event = api_core.emitter
 
 local M = {}
 
+---@class mongo.ui.status.ProcessMeta
+---@field pid integer
+---@field type mongo.api.ProcessType
+---@field state mongo.api.ProcessState
+--
+---@field last_stdout? string
+---@field stdout_dirty boolean
+---@field last_stderr? string
+---@field stderr_dirty boolean
+
 -- Amount of running process.
 local running_cnt = 0 ---@type integer
 

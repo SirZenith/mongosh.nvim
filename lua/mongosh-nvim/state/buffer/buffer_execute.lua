@@ -3,7 +3,7 @@ local buffer_const = require "mongosh-nvim.constant.buffer"
 local BufferType = buffer_const.BufferType
 local FileType = buffer_const.FileType
 
----@type mongo.MongoBufferOperationModule
+---@type mongo.buffer.MongoBufferOperationModule
 local M = {}
 
 function M.on_enter(mbuf)

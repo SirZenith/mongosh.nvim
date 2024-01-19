@@ -64,7 +64,7 @@ local function consume_flag_arg(args, cur_index, flag_stem)
     return new_index, key, value
 end
 
----@alias mongo.RawParsedArgs table<string | number, string | boolean | nil>
+---@alias mongo.command.RawParsedArgs table<string | number, string | boolean | nil>
 
 -- parsed_args takes f-args list and translate flags and positional args into Lua
 -- table.
@@ -82,7 +82,7 @@ end
 -- ```
 ---@param args string[]
 ---@param start_index integer
----@return mongo.RawParsedArgs
+---@return mongo.command.RawParsedArgs
 local function parse_fargs(args, start_index)
     local parsed_args = {}
 
@@ -111,12 +111,12 @@ end
 
 -- ----------------------------------------------------------------------------
 
----@alias mongo.CommandArgType
+---@alias mongo.command.ArgType
 ---| "number"
 ---| "string"
 ---| "boolean"
 
----@type table<mongo.CommandArgType, fun(value: string | boolean): any | nil>
+---@type table<mongo.command.ArgType, fun(value: string | boolean): any | nil>
 local arg_value_converter_map = {
     number = function(value)
         return type(value) == "string" and tonumber(value) or 0
@@ -140,32 +140,32 @@ local arg_value_converter_map = {
     end,
 }
 
----@class mongo.CommandArg
+---@class mongo.command.Argument
 ---@field name string
 ---@field short? string
 ---@field is_flag? boolean # indicating an argument is used as flag
 ---@field is_list? boolean # indicating a positional argument matches multiple value, and implies type `string[]`, can't be used with `is_flag`.
 ---@field is_dummy? boolean # indicating an argument does not consume command line text, only serve as completion item.
----@field type? mongo.CommandArgType
+---@field type? mongo.command.ArgType
 ---@field default? any
 ---@field required? boolean
 
----@alias mongo.CommandActionCallback fun(args: table<string, any>, orig_args: table, unused_args: mongo.RawParsedArgs)
+---@alias mongo.command.ActionCallback fun(args: table<string, any>, orig_args: table, unused_args: mongo.command.RawParsedArgs)
 
----@class mongo.Command
+---@class mongo.command.Command
 ---@field name string
 ---@field range boolean # Does the command support range.
 ---@field buffer? number # If `buffer` has non `nil` value, command will be local to buffer.
 ---@field no_unused_warning? boolean # if `ture`, unused argument warnning will be ignored
 --
----@field action mongo.CommandActionCallback
+---@field action mongo.command.ActionCallback
 ---@field available_checker? fun(): boolean
----@field arg_list mongo.CommandArg[]
----@field _subcommands table<string, mongo.Command>
+---@field arg_list mongo.command.Argument[]
+---@field _subcommands table<string, mongo.command.Command>
 local Command = {}
 Command.__index = Command
 
----@return mongo.Command
+---@return mongo.command.Command
 function Command:new(args)
     local obj = setmetatable({}, self)
 
@@ -185,7 +185,7 @@ function Command:new(args)
 end
 
 -- add_sub_cmd adds all commands in list as subcommand.
----@param commands mongo.Command[]
+---@param commands mongo.command.Command[]
 function Command:add_sub_cmd(commands)
     for _, cmd in ipairs(commands) do
         local name = cmd.name
@@ -201,7 +201,7 @@ end
 
 -- _get_sub_cmd searchs subcommand with given name.
 ---@param name string
----@return mongo.Command?
+---@return mongo.command.Command?
 function Command:_get_sub_cmd(name)
     return self._subcommands[name]
 end
@@ -210,7 +210,7 @@ end
 -- arugment list.
 -- Returns target subcommand and index to first unhandled argument left in list.
 ---@param cur_index integer # index of first unhandled argument
----@return mongo.Command
+---@return mongo.command.Command
 ---@return integer new_index
 function Command:_redirect_to_sub_cmd_by_args(args, cur_index)
     local first_arg = args[cur_index]
@@ -235,7 +235,7 @@ end
 -- This function modifies `raw_parsed`, argument key extracted will be removed
 -- from `raw_parsed`.
 ---@param raw_parsed table<string | number, string | boolean | nil>
----@param arg_spec mongo.CommandArg
+---@param arg_spec mongo.command.Argument
 ---@return string? err
 ---@return any value
 ---@return integer new_pos_index
@@ -337,7 +337,7 @@ end
 ---@param cur_index integer # index of first unhandled argument
 ---@return string? err
 ---@return table<string, any> parsed_args
----@return mongo.RawParsedArgs unused_args
+---@return mongo.command.RawParsedArgs unused_args
 function Command:_parse_args(args, cur_index)
     local raw_parsed = parse_fargs(args, cur_index)
     local parsed_args = {}
@@ -532,20 +532,20 @@ end
 
 -- ----------------------------------------------------------------------------
 
----@class mongo.CommandCreationArg
+---@class mongo.command.CommandCreationArg
 ---@field name string
 ---@field range? boolean
 ---@field buffer? number
 ---@field no_unused_warning? boolean
 --
----@field arg_list? mongo.CommandArg[]
----@field action? mongo.CommandActionCallback
+---@field arg_list? mongo.command.Argument[]
+---@field action? mongo.command.ActionCallback
 ---@field available_checker? fun(): boolean
 --
----@field parent? mongo.Command
+---@field parent? mongo.command.Command
 
----@param args mongo.CommandCreationArg
----@return mongo.Command
+---@param args mongo.command.CommandCreationArg
+---@return mongo.command.Command
 function M.new_cmd(args)
     local cmd = Command:new(args)
 
@@ -557,7 +557,7 @@ function M.new_cmd(args)
     return cmd
 end
 
----@param args mongo.CommandCreationArg
+---@param args mongo.command.CommandCreationArg
 function M.register_cmd(args)
     local cmd = M.new_cmd(args)
     cmd:register()
