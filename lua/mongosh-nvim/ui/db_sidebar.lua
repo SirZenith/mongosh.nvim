@@ -159,129 +159,82 @@ end
 
 -- ----------------------------------------------------------------------------
 
+---@class mongo.ui.SideBarDisplayInfo
+---@field preview_winnr integer # preview window number in this tabpage
+---@field winnr integer # window number used by sidebar buffer
+
 ---@class mongo.ui.UIDBSidebar
----@field bufnr? integer
----@field winnr? integer
----@field preview_winnr integer
----@field databases mongo.ui.DBSideItem[]
+---@field _bufnr? integer
+---@field _databases mongo.ui.DBSideItem[]
 --
----@field item_ranges { st: integer, ed: integer }[] # display range of sidebar items, 1-base closed intervals
+---@field _item_ranges { st: integer, ed: integer }[] # display range of sidebar items, 1-base closed intervals
 local UIDBSidebar = {}
 UIDBSidebar.__index = UIDBSidebar
+
+-- Mapping tabpage number to display info in this tabpage.
+---@type table<integer, mongo.ui.SideBarDisplayInfo>
+UIDBSidebar._display_map = {}
 
 UIDBSidebar.winhl_map = {
     Normal = HLGroup.Normal,
 }
 
+-- Get display info for given tabpage.
+-- Class method
+---@param tabpage integer # tabpage id
+function UIDBSidebar:get_info_in_tabpage(tabpage)
+    return self._display_map[tabpage]
+end
+
+-- UPdate display info for given tabpage.
+---@param tabpage integer
+---@param info mongo.ui.SideBarDisplayInfo? # passing `nil` means deleting record.
+function UIDBSidebar:set_info_in_tabpage(tabpage, info)
+    self._display_map[tabpage] = info
+end
+
 -- Create a new sidebar object with given window as preview window.
 -- When collection in sidebar is selected, new query buffer will be created and
 -- displayed in preview window.
----@param preview_winnr integer
 ---@return mongo.ui.UIDBSidebar
-function UIDBSidebar:new(preview_winnr)
+function UIDBSidebar:new()
     local obj = setmetatable({}, self)
 
-    obj.bufnr = api.nvim_create_buf(false, true)
-    obj.preview_winnr = preview_winnr
-    obj.databases = {}
+    obj._databases = {}
+    obj._item_ranges = {}
 
-    obj:register_events()
+    obj:init_events()
 
     return obj
 end
 
--- Setup event listener and auto command for panel.
-function UIDBSidebar:register_events()
-    local bufnr = self:get_buffer()
-    if not bufnr then return end
-
-    api.nvim_create_autocmd("BufUnload", {
-        buffer = bufnr,
-        callback = function()
-            self:destory()
-        end
-    })
-
+function UIDBSidebar:init_events()
     core_emitter:on(CoreEventType.collection_list_update, self.on_collection_list_update, self)
-
-    vim.keymap.set("n", "<Cr>", function()
-        self:select_under_cursor()
-    end, { buffer = bufnr })
 end
 
-function UIDBSidebar:destory()
-    self.bufnr = nil
-    api_core.emitter:off_all(self)
-end
-
----@return boolean
-function UIDBSidebar:is_valid()
-    return self:get_buffer() ~= nil
-end
-
--- Set database name list with given name array.
-function UIDBSidebar:update_databases(databases)
-    local items = {}
-
-    for _, name in ipairs(databases) do
-        items[#items + 1] = DBSideItem:new(name)
-    end
-
-    self.databases = items
-end
-
----@return integer? bufnr
-function UIDBSidebar:get_buffer()
-    local bufnr = self.bufnr
-    if not bufnr then return bufnr end
-
-    if not api.nvim_buf_is_valid(bufnr)
-        or not api.nvim_buf_is_loaded(bufnr)
-    then
-        bufnr = nil
-        self:destory()
-    end
-
-    return bufnr
-end
-
----@return integer? winnr
-function UIDBSidebar:get_preview_win()
-    local winnr = self.winnr
-    if not winnr then return end
-
-    local preview_winnr = self.preview_winnr
-    if not preview_winnr or not api.nvim_win_is_valid(preview_winnr) then
-        vim.cmd "rightbelow vsplit"
-        preview_winnr = api.nvim_get_current_win()
-
-        local wo = vim.wo[preview_winnr]
-        wo.winhl = ""
-
-        api.nvim_win_set_width(winnr, config.sidebar.width)
-        api.nvim_set_current_win(winnr)
-
-        self.preview_winnr = preview_winnr
-    end
-
-    return preview_winnr
-end
-
--- Make vertical split on the left, and writes database list to it.
-function UIDBSidebar:show()
+-- Setup basic option and keybinding for sidebar buffer.
+function UIDBSidebar:setup_buffer()
     local bufnr = self:get_buffer()
-    if not bufnr then return end
 
     local bo = vim.bo[bufnr]
-    bo.bufhidden = "delete"
     bo.buftype = "nofile"
     bo.filetype = buffer_const.DB_SIDEBAR_FILETYPE
     bo.modifiable = false
 
-    vim.cmd "leftabove vsplit"
-    local winnr = api.nvim_get_current_win()
-    self.winnr = winnr
+    local kset = vim.keymap.set
 
+    kset("n", "<Cr>", function()
+        self:select_under_cursor()
+    end, { buffer = bufnr })
+
+    kset("n", "<C-r>", function()
+        self:update_collection_list_for_all_expanded_db()
+    end)
+end
+
+-- Setup window option before displying sidebar buffer in that window.
+---@param winnr integer
+function UIDBSidebar:setup_window(winnr)
     local wo = vim.wo[winnr]
     wo.signcolumn = "yes"
     wo.number = false
@@ -293,25 +246,128 @@ function UIDBSidebar:show()
     end
     wo.winhl = table.concat(winhl_buffer, ",")
 
+    local bufnr = self:get_buffer()
     api.nvim_win_set_buf(winnr, bufnr)
     api.nvim_win_set_width(winnr, config.sidebar.width)
-
-    self:write_to_buffer()
 end
 
-function UIDBSidebar:hide()
-    local winnr = self.winnr
-    self.winnr = nil
+-- Set database name list with given name array.
+function UIDBSidebar:update_databases(databases)
+    local items = {}
+
+    local old_item_map = {} ---@type table<string, mongo.ui.DBSideItem>
+    for _, item in ipairs(self._databases) do
+        old_item_map[item.name] = item
+    end
+
+    for _, name in ipairs(databases) do
+        local item = old_item_map[name] or DBSideItem:new(name)
+        items[#items + 1] = item
+    end
+
+    self._databases = items
+end
+
+-- Get buffer number used by sidebar object, a new buffer is created if no validr
+-- buffer is currently being in use.
+---@return integer bufnr
+function UIDBSidebar:get_buffer()
+    local bufnr = self._bufnr
+    if not bufnr
+        or not api.nvim_buf_is_valid(bufnr)
+    then
+        bufnr = api.nvim_create_buf(false, true)
+        self._bufnr = bufnr
+        self:setup_buffer()
+    end
+
+    return bufnr
+end
+
+-- Get preview window number in current tabpage.
+---@return integer? winnr
+function UIDBSidebar:get_preview_win()
+    local tabpage = api.nvim_get_current_tabpage()
+    local info = self:get_info_in_tabpage(tabpage)
+    if not info then return end
+
+    local preview_winnr = info.preview_winnr
+
+    if not preview_winnr
+        or not api.nvim_win_is_valid(preview_winnr)
+    then
+        vim.cmd "rightbelow vsplit"
+        preview_winnr = api.nvim_get_current_win()
+
+        local wo = vim.wo[preview_winnr]
+        wo.winhl = ""
+
+        local winnr = info.winnr
+        api.nvim_win_set_width(winnr, config.sidebar.width)
+        api.nvim_set_current_win(winnr)
+
+        info.preview_winnr = preview_winnr
+    end
+
+    return preview_winnr
+end
+
+-- Make vertical split on the left, and writes database list to it.
+---@param tabpage integer # tabpage id
+---@param preview_winnr integer # preview window number
+function UIDBSidebar:show(tabpage, preview_winnr)
+    local db_names = api_core.get_filtered_db_list()
+    self:update_databases(db_names)
+
+    local info = self:get_info_in_tabpage(tabpage)
+
+    local winnr = info and info.winnr
+    local bufnr = self:get_buffer()
+
+    if winnr and api.nvim_win_is_valid(info.winnr) then
+        api.nvim_win_set_buf(info.winnr, bufnr)
+        return
+    end
+
+    vim.cmd "leftabove vsplit"
+    winnr = api.nvim_get_current_win()
+    self:setup_window(winnr)
+
+    self:write_to_buffer()
+
+    self:set_info_in_tabpage(tabpage, {
+        preview_winnr = preview_winnr,
+        winnr = winnr,
+    })
+end
+
+-- Hide sidebar in givn tabpage
+---@param tabpage integer
+function UIDBSidebar:hide(tabpage)
+    local info = self:get_info_in_tabpage(tabpage)
+    local winnr = info and info.winnr
 
     if winnr and api.nvim_win_is_valid(winnr) then
         api.nvim_win_hide(winnr)
     end
+
+    self:set_info_in_tabpage(tabpage, nil)
+end
+
+-- Check sidebar window is still valid in given window.
+---@param tabpage integer
+---@return boolean
+function UIDBSidebar:is_valid_in_tabpage(tabpage)
+    local info = self:get_info_in_tabpage(tabpage)
+    local winnr = info and info.winnr
+
+    return winnr ~= nil and api.nvim_win_is_valid(winnr)
 end
 
 ---@param db string
 function UIDBSidebar:on_collection_list_update(db)
     local target
-    for _, item in ipairs(self.databases) do
+    for _, item in ipairs(self._databases) do
         if item.name == db then
             target = item
             break
@@ -349,7 +405,7 @@ function UIDBSidebar:write_to_buffer()
     }
 
     local sum = #write_infos
-    for _, item in ipairs(self.databases) do
+    for _, item in ipairs(self._databases) do
         local line_cnt = item:write_to_buffer(write_infos)
         local range = { st = sum + 1, ed = sum + line_cnt }
         ranges[#ranges + 1] = range
@@ -357,7 +413,7 @@ function UIDBSidebar:write_to_buffer()
         sum = sum + line_cnt
     end
 
-    self.item_ranges = ranges
+    self._item_ranges = ranges
 
     local lines = {}
     local hl_lines = {}
@@ -377,14 +433,18 @@ end
 
 -- Issue `select` movement with current cursor postion
 function UIDBSidebar:select_under_cursor()
+    local tabpage = api.nvim_get_current_tabpage()
+    local info = self:get_info_in_tabpage(tabpage)
+    if not info then return end
+
     local winnr = api.nvim_get_current_win()
-    if winnr ~= self.winnr then return end
+    if winnr ~= info.winnr then return end
 
     local pos = api.nvim_win_get_cursor(winnr)
     local row = pos[1]
 
     local target_index, entry_index
-    for i, range in ipairs(self.item_ranges) do
+    for i, range in ipairs(self._item_ranges) do
         if row >= range.st and row <= range.ed then
             target_index = i
             entry_index = row - range.st + 1
@@ -394,7 +454,7 @@ function UIDBSidebar:select_under_cursor()
 
     if not target_index or not entry_index then return end
 
-    local target_item = self.databases[target_index]
+    local target_item = self._databases[target_index]
     local result = target_item:select_with_index(entry_index)
     if not result then
         return
@@ -442,42 +502,36 @@ function UIDBSidebar:on_select_collection(item, collection)
     self:write_to_buffer()
 end
 
+function UIDBSidebar:update_collection_list_for_all_expanded_db()
+    for _, item in ipairs(self._databases) do
+        if item.expanded and not item.is_loading then
+            item.is_loading = true
+            api_core.update_collection_list(item.name)
+        end
+    end
+    self:write_to_buffer()
+end
+
 -- ----------------------------------------------------------------------------
 
--- mapping tabpage id to sidebar object
-local sidebar_map = {} ---@type table<integer, mongo.ui.UIDBSidebar>
+local db_sidebar = UIDBSidebar:new()
 
 function M.show()
     local tabpage = api.nvim_get_current_tabpage()
-    local sidebar = sidebar_map[tabpage]
-    if sidebar and sidebar:is_valid() then return end
-
-    local winnr = api.nvim_get_current_win()
-    sidebar = UIDBSidebar:new(winnr)
-    sidebar_map[tabpage] = sidebar
-
-    sidebar.preview_winnr = winnr
-
-    local db_names = api_core.get_filtered_db_list()
-    sidebar:update_databases(db_names)
-
-    sidebar:show()
+    local preview_winnr = api.nvim_get_current_win()
+    db_sidebar:show(tabpage, preview_winnr)
 end
 
 function M.hide()
     local tabpage = api.nvim_get_current_tabpage()
-    local sidebar = sidebar_map[tabpage]
-    if not sidebar then return end
-
-    sidebar:hide()
-    sidebar_map[tabpage] = nil
+    db_sidebar:hide(tabpage)
 end
 
 function M.toggle()
     local tabpage = api.nvim_get_current_tabpage()
-    local sidebar = sidebar_map[tabpage]
+    local is_valid = db_sidebar:is_valid_in_tabpage(tabpage)
 
-    if sidebar and sidebar:is_valid() then
+    if is_valid then
         M.hide()
     else
         M.show()
