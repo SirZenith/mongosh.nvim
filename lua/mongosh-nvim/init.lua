@@ -37,8 +37,6 @@ function M.setup(options)
         log.warn("mongosh executable not found")
         config.executable = nil
     end
-
-    status.set_components(config.status_line.components)
 end
 
 return M
