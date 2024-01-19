@@ -691,13 +691,6 @@ function TreeViewItem:write_to_buffer(bufnr)
 
     if not self._range_update_to_date then
         self:settle_item_range()
-
-        -- write place holder lines
-        local lines = {}
-        for i = 1, builder:get_line_cnt() do
-            lines[i] = ""
-        end
-        vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
     end
 
     local winnr = buffer_util.get_win_by_buf(bufnr, true);
@@ -705,7 +698,6 @@ function TreeViewItem:write_to_buffer(bufnr)
         return
     end
 
-    builder:reset()
     local st_line = vim.fn.getpos("w0")[2]
     local ed_line = vim.fn.getpos("w$")[2]
 
@@ -729,8 +721,6 @@ function TreeViewItem:settle_item_range()
     })
 
     self._range_update_to_date = true
-
-    self:debug_print_range()
 end
 
 -- Check if current entry should write content to builder with given context.
@@ -753,28 +743,6 @@ function TreeViewItem:check_should_write_by_context(context)
     if no_intersection then return false end
 
     return true
-end
-
----@param indent? string
-function TreeViewItem:debug_print_range(indent)
-    indent = indent and indent .. "    " or ""
-    vim.print(("%s(%d, %d)"):format(indent, self.st_row, self.ed_row))
-
-    local type = self.child_table_type
-    local keys = self.obj_key_show_order
-
-    if type == NestingType.Array then
-        for i = 1, #self.children do
-            local child = self.children[i]
-            child:debug_print_range(indent)
-        end
-    elseif type == NestingType.Object and keys then
-        for i = 1, #keys do
-            local key = keys[i]
-            local child = self.children[key]
-            child:debug_print_range(indent)
-        end
-    end
 end
 
 -- Try to toggle expansion state of an entry at row number `at_row`.

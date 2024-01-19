@@ -18,7 +18,7 @@ local M = {}
 -- ----------------------------------------------------------------------------
 
 -- map result buffer creation sytle to buffer maker function
----@type table<mongo.buffer.CreateBufferStyle, fun(mbuf: mongo.buffer.MongoBuffer): integer>
+---@type table<mongo.buffer.CreateBufferStyle, fun(mbuf: mongo.buffe.MongoBuffer): integer>
 local result_buffer_getter_map = {
     -- No matter whether old buffer exists or not, a new buffer will be created.
     [CreateBufferStyle.Always] = function()
@@ -94,15 +94,14 @@ end
 ---@field state_args? table<string, any>
 
 ---@class mongo.buffer.MongoBufferOperationModule
----@field on_enter? fun(mbuf: mongo.buffer.MongoBuffer) # gets called every time buffer is going to be dispalyed in window.
----@field on_show? fun(mbuf: mongo.buffer.MongoBuffer) # gets called every time after buffer is displyed in a window.
----@field on_leave? fun(mbuf: mongo.buffer.MongoBuffer) # gets call when buffer is going be chnaged to another type.
----@field content_writer? fun(mbuf: mongo.buffer.MongoBuffer, callback: fun(err: string?))
----@field result_args_generator? fun(mbuf: mongo.buffer.MongoBuffer, args: table<string, any>, callback: fun(err: string?, args: mongo.buffer.BufferResultArgs?))
----@field on_result_failed? fun(mbuf: mongo.buffer.MongoBuffer, err: string)
----@field on_result_successed? fun(mbuf: mongo.buffer.MongoBuffer, result_obj: mongo.buffer.MongoBuffer)
----@field refresher? fun(mbuf: mongo.buffer.MongoBuffer, callback: fun(err?: string))
----@field convert_type? fun(mbuf: mongo.buffer.MongoBuffer, args: table<string, any>, callback: fun(err?: string))
+---@field on_enter? fun(mbuf: mongo.buffe.MongoBuffer)
+---@field on_leave? fun(mbuf: mongo.buffe.MongoBuffer)
+---@field content_writer? fun(mbuf: mongo.buffe.MongoBuffer, callback: fun(err: string?))
+---@field result_args_generator? fun(mbuf: mongo.buffe.MongoBuffer, args: table<string, any>, callback: fun(err: string?, args: mongo.buffer.BufferResultArgs?))
+---@field on_result_failed? fun(mbuf: mongo.buffe.MongoBuffer, err: string)
+---@field on_result_successed? fun(mbuf: mongo.buffe.MongoBuffer, result_obj: mongo.buffe.MongoBuffer)
+---@field refresher? fun(mbuf: mongo.buffe.MongoBuffer, callback: fun(err?: string))
+---@field convert_type? fun(mbuf: mongo.buffe.MongoBuffer, args: table<string, any>, callback: fun(err?: string))
 
 ---@type table<mongo.buffer.BufferType, mongo.buffer.MongoBufferOperationModule>
 local OPERATION_MAP = {
@@ -124,7 +123,7 @@ local FALLBACK_OP_MODEL = OPERATION_MAP[FALLBACK_BUFFER_TYPE]
 
 -- ----------------------------------------------------------------------------
 
----@class mongo.buffer.MongoBuffer : mongo.buffer.MongoBufferOperationModule
+---@class mongo.buffe.MongoBuffer : mongo.buffer.MongoBufferOperationModule
 --
 ---@field _type mongo.buffer.BufferType
 ---@field _is_user_buffer boolean # Whether this buffer is created by user
@@ -157,7 +156,7 @@ end
 -- get_buffer_obj returns buffer object of given buffer if that buffer is created
 -- by this plugin, otherwise `nil` is returned.
 ---@param bufnr integer # buffer number
----@return mongo.buffer.MongoBuffer?
+---@return mongo.buffe.MongoBuffer?
 function MongoBuffer.get_buffer_obj(bufnr)
     return MongoBuffer._instance_map[bufnr]
 end
@@ -170,7 +169,7 @@ end
 ---@field is_user_buffer? boolean
 
 ---@param args mongo.buffer.MongoBufferCreateArgs
----@return mongo.buffer.MongoBuffer
+---@return mongo.buffe.MongoBuffer
 function MongoBuffer:new(args)
     local obj = setmetatable({}, self)
 
@@ -209,7 +208,7 @@ end
 -- Dummy buffer objects are not registered to global mongo buffer map.
 ---@param type mongo.buffer.BufferType
 ---@param lines string[]
----@return mongo.buffer.MongoBuffer
+---@return mongo.buffe.MongoBuffer
 function MongoBuffer:new_dummy(type, lines)
     local obj = setmetatable({}, self)
 
@@ -331,8 +330,6 @@ function MongoBuffer:show(split_style, win)
 
     self._winnr = win
     api.nvim_win_set_buf(win, bufnr)
-
-    self:on_show()
 end
 
 -- Return buffer type of this object.
@@ -432,7 +429,7 @@ end
 ---@param type mongo.buffer.BufferType
 ---@param bufnr? integer
 ---@return string? err
----@return mongo.buffer.MongoBuffer?
+---@return mongo.buffe.MongoBuffer?
 function MongoBuffer:make_result_buffer_obj(type, bufnr)
     bufnr = bufnr or self:make_result_buffer()
     if bufnr <= 0 then
@@ -523,7 +520,7 @@ end
 -- Make a new mongo buffer without showing it on screen.
 ---@param type mongo.buffer.BufferType
 ---@param lines string[]
----@return mongo.buffer.MongoBuffer
+---@return mongo.buffe.MongoBuffer
 function M.create_mongo_buffer(type, lines)
     local mbuf = MongoBuffer:new { type = type }
 
@@ -535,7 +532,7 @@ end
 -- Make a new dummy mongo buffer with given content.
 ---@param type mongo.buffer.BufferType
 ---@param lines string[]
----@return mongo.buffer.MongoBuffer
+---@return mongo.buffe.MongoBuffer
 function M.create_dummy_mongo_buffer(type, lines)
     return MongoBuffer:new_dummy(type, lines)
 end
@@ -543,7 +540,7 @@ end
 -- Create a MongoBuffer object for given buffer.
 ---@param type mongo.buffer.BufferType
 ---@param bufnr integer
----@return mongo.buffer.MongoBuffer
+---@return mongo.buffe.MongoBuffer
 function M.wrap_with_mongo_buffer(type, bufnr)
     local mbuf = MongoBuffer:new {
         type = type,
@@ -555,7 +552,7 @@ end
 -- Look up mongo buffer object for given buffer number.
 -- Returns such object if found, otherwise returns `nil`.
 ---@param bufnr integer
----@return mongo.buffer.MongoBuffer?
+---@return mongo.buffe.MongoBuffer?
 function M.try_get_mongo_buffer(bufnr)
     return MongoBuffer.get_buffer_obj(bufnr)
 end
