@@ -3,9 +3,7 @@ local buffer_const = require "mongosh-nvim.constant.buffer"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
 local config = require "mongosh-nvim.config"
 local hl_const = require "mongosh-nvim.constant.highlight"
-local log = require "mongosh-nvim.log"
 local util = require "mongosh-nvim.util"
-local buffer_util = require "mongosh-nvim.util.buffer"
 local hl_util = require "mongosh-nvim.util.highlight"
 local list_util = require "mongosh-nvim.util.list"
 local str_util = require "mongosh-nvim.util.str"
@@ -57,11 +55,6 @@ end
 ---@field line string
 ---@field hl_items mongo.higlight.HLItem[]
 
--- Extra arguments for specifying how TreeItem render its content.
----@class mongo.buffer.TreeViewWriteContext
----@field is_dry_run? boolean # when true, lines are added to builder with no actual content.
----@field write_range? { [1]: integer, [2]: integer } # starting and ending line number of visible range of buffer, interval is closed on both side.
-
 -- ----------------------------------------------------------------------------
 
 ---@class mongo.buffer.TreeViewItem
@@ -84,10 +77,6 @@ end
 ---@field card_st_col integer # 1-base column index, recording starting point of object card
 ---@field card_max_content_col integer # 1-base column index, recording position of last character of longest card content line.
 ---@field obj_key_show_order? (string | number)[] # display order of object field used during last write.
---
----@field _builder? mongo.highlight.HighlightBuilder
----@field _range_update_to_date boolean # whether entry range infomation is updated after binded value did.
----@field _output_up_to_date boolean # whether entry content has been written to builder.
 local TreeViewItem = {}
 TreeViewItem.__index = TreeViewItem
 
@@ -173,21 +162,6 @@ function TreeViewItem:update_binded_value(value)
     end
 
     self:update_expansion_state()
-
-    self._range_update_to_date = false
-    self._output_up_to_date = false
-end
-
----@return mongo.highlight.HighlightBuilder
-function TreeViewItem:get_builder()
-    local builder = self.builder
-
-    if not builder then
-        builder = hl_util.HighlightBuilder:new()
-        self.builder = builder
-    end
-
-    return builder
 end
 
 function TreeViewItem:update_expansion_state()
@@ -341,10 +315,7 @@ end
 -- This method is supposed to be called before adding shifting builder to new
 -- line and after an child entry calls its `write_to_builder` method.
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
-function TreeViewItem:try_update_max_content_col(builder, context)
-    if context.is_dry_run then return end
-
+function TreeViewItem:try_update_max_content_col(builder)
     local line_len = builder:get_cur_line_display_width()
     if self.card_max_content_col < line_len then
         self.card_max_content_col = line_len
@@ -352,12 +323,8 @@ function TreeViewItem:try_update_max_content_col(builder, context)
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
 ---@param indent_level integer
-function TreeViewItem:write_simple_value(builder, context, indent_level)
-    local should_write = self:check_should_write_by_context(context)
-    if not should_write then return end
-
+function TreeViewItem:write_simple_value(builder, indent_level)
     local meta = VALUE_TYPE_NAME_MAP[self.type]
     local write = meta and meta.write
 
@@ -369,12 +336,7 @@ function TreeViewItem:write_simple_value(builder, context, indent_level)
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
----@param indent_level integer
-function TreeViewItem:write_collapsed_table(builder, context, indent_level)
-    local should_write = self:check_should_write_by_context(context)
-    if not should_write then return end
-
+function TreeViewItem:write_collapsed_table(builder, indent_level)
     local nesting_type = self.child_table_type
 
     local children = self.children
@@ -409,18 +371,15 @@ function TreeViewItem:write_collapsed_table(builder, context, indent_level)
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
 ---@param indent_level integer
-function TreeViewItem:write_array_table(builder, context, indent_level)
+function TreeViewItem:write_array_table(builder, indent_level)
     -- Top level array is transparent, all elementse are exposed directly without
     -- wrapping.
-
-    local should_write = self:check_should_write_by_context(context)
 
     local is_top_level = self.is_top_level
     if is_top_level then
         indent_level = indent_level - 1
-    elseif should_write then
+    else
         builder:write("[", get_key_hl_by_indent_level(indent_level))
     end
 
@@ -433,23 +392,21 @@ function TreeViewItem:write_array_table(builder, context, indent_level)
     for i = 1, child_cnt do
         local item = children[i]
 
-        self:try_update_max_content_col(builder, context)
+        self:try_update_max_content_col(builder)
         builder:new_line()
 
         local is_card = is_top_level
             and item.expanded
             and item.child_table_type == NestingType.Object
 
-        if should_write then
-            builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
+        builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
 
-            if not is_card then
-                builder:write(edge_char, indent_hl_group)
-                builder:write(get_indent_str_by_indent_level(indent_level + 1), indent_hl_group)
-            end
+        if not is_card then
+            builder:write(edge_char, indent_hl_group)
+            builder:write(get_indent_str_by_indent_level(indent_level + 1), indent_hl_group)
         end
 
-        item:write_to_builder(builder, context, indent_level + 1, is_card)
+        item:write_to_builder(builder, indent_level + 1, is_card)
         if item.card_max_content_col > self.card_max_content_col then
             self.card_max_content_col = item.card_max_content_col
         end
@@ -457,29 +414,22 @@ function TreeViewItem:write_array_table(builder, context, indent_level)
 
     if not self.is_top_level then
         if child_cnt > 0 then
-            self:try_update_max_content_col(builder, context)
+            self:try_update_max_content_col(builder)
             builder:new_line()
-
-            if should_write then
-                builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
-                builder:write(edge_char, indent_hl_group)
-                builder:write(get_indent_str_by_indent_level(indent_level), HLGroup.TreeNormal)
-            end
+            builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
+            builder:write(edge_char, indent_hl_group)
+            builder:write(get_indent_str_by_indent_level(indent_level), HLGroup.TreeNormal)
         end
 
-        if should_write then
-            builder:write("]", get_key_hl_by_indent_level(indent_level))
-        end
+        builder:write("]", get_key_hl_by_indent_level(indent_level))
     end
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
 ---@param indent_level integer
 ---@param is_card boolean
-function TreeViewItem:write_object_table(builder, context, indent_level, is_card)
+function TreeViewItem:write_object_table(builder, indent_level, is_card)
     is_card = is_card or false
-    local should_write = self:check_should_write_by_context(context)
 
     local edge_char = config.card_view.card.edge_char.left
     local nested_hl_group = get_key_hl_by_indent_level(indent_level + 1)
@@ -497,7 +447,7 @@ function TreeViewItem:write_object_table(builder, context, indent_level, is_card
 
     local child_cnt = #keys
 
-    if should_write and not is_card then
+    if not is_card then
         if self.is_top_level then
             builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
             builder:write(edge_char, key_hl_group)
@@ -510,78 +460,65 @@ function TreeViewItem:write_object_table(builder, context, indent_level, is_card
         local key = keys[i]
         local item = children[key]
 
-        self:try_update_max_content_col(builder, context)
+        self:try_update_max_content_col(builder)
         builder:new_line()
+        builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
 
-        if should_write then
-            builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
+        if is_card and self.card_st_col == 0 then
+            self.card_st_col = builder:get_cur_line_display_width()
+        end
 
-            if is_card and self.card_st_col == 0 then
-                self.card_st_col = builder:get_cur_line_display_width()
-            end
+        local edge_hl_group = item.child_table_type ~= NestingType.None
+            and nested_hl_group
+            or key_hl_group
+        builder:write(edge_char, edge_hl_group)
+        builder:write(get_indent_str_by_indent_level(indent_level + 1), HLGroup.TreeNormal)
+        builder:write(tostring(key), key_hl_group)
+        builder:write(": ", HLGroup.TreeNormal)
+        item:write_to_builder(builder, indent_level + 1)
 
-            local edge_hl_group = item.child_table_type ~= NestingType.None
-                and nested_hl_group
-                or key_hl_group
-            builder:write(edge_char, edge_hl_group)
-            builder:write(get_indent_str_by_indent_level(indent_level + 1), HLGroup.TreeNormal)
-            builder:write(tostring(key), key_hl_group)
-            builder:write(": ", HLGroup.TreeNormal)
-            item:write_to_builder(builder, context, indent_level + 1)
-
-            if item.card_max_content_col > self.card_max_content_col then
-                self.card_max_content_col = item.card_max_content_col
-            end
+        if item.card_max_content_col > self.card_max_content_col then
+            self.card_max_content_col = item.card_max_content_col
         end
     end
 
     if child_cnt > 0 then
-        self:try_update_max_content_col(builder, context)
+        self:try_update_max_content_col(builder)
         builder:new_line()
+        builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
 
-        if should_write then
-            builder:write((" "):rep(MAX_TYPE_NAME_LEN), HLGroup.TreeNormal)
-
-            if not is_card then
-                builder:write(edge_char, key_hl_group)
-                builder:write(get_indent_str_by_indent_level(indent_level), key_hl_group)
-            end
+        if not is_card then
+            builder:write(edge_char, key_hl_group)
+            builder:write(get_indent_str_by_indent_level(indent_level), key_hl_group)
         end
     end
 
-    if should_write and not is_card then
+    if not is_card then
         builder:write(("}"), get_key_hl_by_indent_level(indent_level))
     end
 end
 
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
 ---@param indent_level integer
 ---@param is_card boolean
-function TreeViewItem:write_table_value(builder, context, indent_level, is_card)
+function TreeViewItem:write_table_value(builder, indent_level, is_card)
     local nesting_type = self.child_table_type
 
     if not self.expanded or nesting_type == NestingType.EmptyTable then
-        self:write_collapsed_table(builder, context, indent_level)
+        self:write_collapsed_table(builder, indent_level)
     elseif nesting_type == NestingType.Array then
-        self:write_array_table(builder, context, indent_level)
+        self:write_array_table(builder, indent_level)
     elseif nesting_type == NestingType.Object then
-        self:write_object_table(builder, context, indent_level, is_card)
+        self:write_object_table(builder, indent_level, is_card)
     else
-        local should_write = self:check_should_write_by_context(context)
-        if should_write then
-            builder:write("<lua-table>", HLGroup.ValueOmited)
-        end
+        builder:write("<lua-table>", HLGroup.ValueOmited)
     end
 end
 
 -- Write all child object cards' edges to builder.
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
 ---@param indent_level integer
-function TreeViewItem:finishing_object_cards(builder, context, indent_level)
-    if context.is_dry_run then return end
-
+function TreeViewItem:finishing_object_cards(builder, indent_level)
     if self.child_table_type ~= NestingType.Array then
         return
     end
@@ -658,10 +595,9 @@ end
 
 -- Write tree structure into a highlight builder
 ---@param builder mongo.highlight.HighlightBuilder
----@param context mongo.buffer.TreeViewWriteContext
 ---@param indent_level? integer
----@param is_card? boolean # only when top level array draws its object child, this value would be true.
-function TreeViewItem:write_to_builder(builder, context, indent_level, is_card)
+---@param is_card? boolean
+function TreeViewItem:write_to_builder(builder, indent_level, is_card)
     indent_level = indent_level or 0
     is_card = is_card or false
 
@@ -671,15 +607,15 @@ function TreeViewItem:write_to_builder(builder, context, indent_level, is_card)
     self.obj_key_show_order = nil
 
     if self.child_table_type == NestingType.None then
-        self:write_simple_value(builder, context, indent_level)
+        self:write_simple_value(builder, indent_level)
     else
-        self:write_table_value(builder, context, indent_level, is_card)
+        self:write_table_value(builder, indent_level, is_card)
     end
 
     self.ed_row = builder:get_line_cnt()
 
     if self.is_top_level and self.expanded then
-        self:finishing_object_cards(builder, context, indent_level)
+        self:finishing_object_cards(builder, indent_level)
     end
 end
 
@@ -687,62 +623,12 @@ end
 -- given buffer.
 ---@param bufnr integer
 function TreeViewItem:write_to_buffer(bufnr)
-    local builder = self:get_builder()
-
-    if not self._range_update_to_date then
-        self:settle_item_range()
-    end
-
-    local winnr = buffer_util.get_win_by_buf(bufnr, true);
-    if not winnr then
-        return
-    end
-
-    local st_line = vim.fn.getpos("w0")[2]
-    local ed_line = vim.fn.getpos("w$")[2]
-
-    self:write_to_builder(builder, {
-        is_dry_run = false,
-        write_range = { st_line, ed_line },
-    })
+    local builder = hl_util.HighlightBuilder:new()
+    self:write_to_builder(builder)
 
     local lines, hl_lines = builder:build()
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, true, lines)
     hl_util.add_hl_to_buffer(bufnr, 0, hl_lines)
-end
-
--- Update range infomation of current entry and its children.
-function TreeViewItem:settle_item_range()
-    local builder = self:get_builder()
-    builder:reset()
-
-    self:write_to_builder(builder, {
-        is_dry_run = true,
-    })
-
-    self._range_update_to_date = true
-end
-
--- Check if current entry should write content to builder with given context.
----@param context mongo.buffer.TreeViewWriteContext
----@return boolean
-function TreeViewItem:check_should_write_by_context(context)
-    if context.is_dry_run then
-        return false
-    end
-
-    local range = context.write_range
-    local no_intersection = false
-    if range then
-        if not self._range_update_to_date then
-            log.warn "entry range is out of date for checking"
-        end
-        no_intersection = range[1] > self.ed_row or range[2] < self.st_row
-    end
-
-    if no_intersection then return false end
-
-    return true
 end
 
 -- Try to toggle expansion state of an entry at row number `at_row`.
@@ -938,7 +824,7 @@ function TreeViewItem:find_edit_target(row)
     }
 end
 
--- Issue an edit to the entry at specified row number.
+-- Issue an edti to the entry at specified row number.
 ---@param row? integer # 1-base row index, default to cursor row.
 ---@param collection string
 ---@param callback fun(err?: string)
