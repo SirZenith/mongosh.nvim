@@ -32,7 +32,14 @@ M.QUERY_DECLARATION_RESULT = [[
 M.QUERY_COLLECTION_NAME_FROM_FUNC_CALL = [[
 (call_expression
     function: (member_expression
-        object: (_) @object
+        object: [
+            (subscript_expression
+                (identifier) @ident (#eq? @ident "db")
+            )
+            (member_expression
+                (identifier) @ident (#eq? @ident "db")
+            )
+        ] @object
     )
 )
 ]]
