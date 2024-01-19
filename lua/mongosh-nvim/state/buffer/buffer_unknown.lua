@@ -18,6 +18,9 @@ function M.on_enter(mbuf)
     bo.filetype = FileType.Unknown
 end
 
+function M.on_show(_)
+end
+
 function M.on_leave(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -41,7 +44,7 @@ function M.on_result_failed(_, err)
     log.warn(err)
 end
 
-function M.on_result_successed()
+function M.on_result_successed(_)
 end
 
 function M.refresher(_, callback)
