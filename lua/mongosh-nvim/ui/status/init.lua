@@ -6,19 +6,6 @@ local status_base = require "mongosh-nvim.ui.status.base"
 local M = {}
 
 -- ----------------------------------------------------------------------------
-
----@enum mongo.ui.status.StatusType
-local State = {
-    Inactive = 1,
-    Idle = 2,
-    Execute = 3,
-    Query = 4,
-    Edit = 5,
-    DataUpdate = 6,
-    Error = 7,
-}
-
--- ----------------------------------------------------------------------------
 -- Component Loading
 
 ---@type (mongo.ui.status.Component | string)[]
@@ -36,6 +23,11 @@ local component_loader = {
     _current_host = function()
         local connection_comp = require "mongosh-nvim.ui.status.component.connection"
         return connection_comp.current_host
+    end,
+
+    _operation_state = function()
+        local operation = require "mongosh-nvim.ui.status.component.operation"
+        return operation.operation_state
     end,
 
     _running_cnt = function()
@@ -146,15 +138,9 @@ function M.set_components(comp_values)
     end
 end
 
--- Generate status line text, prefere using cached line if not specified.
----@param force? boolean
+-- Generate status line text.
 ---@return string
-function M.status(force)
-    local cached = status_base.get_cached_status_line()
-    if cached and not force then
-        return cached
-    end
-
+function M.get_status_line()
     local buffer = {}
     for i, comp in ipairs(active_components) do
         local args = active_component_args[i]
@@ -172,6 +158,20 @@ function M.status(force)
     end
 
     local line = table.concat(buffer)
+
+    return line
+end
+
+-- Generate status line text, prefere using cached line if not specified.
+---@param _ table # lualine module table.
+---@return string
+function M.status(_)
+    local cached = status_base.get_cached_status_line()
+    if cached then
+        return cached
+    end
+
+    local line = M.get_status_line()
     status_base.set_cached_status_line(line)
 
     return line

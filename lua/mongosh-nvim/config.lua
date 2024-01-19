@@ -224,7 +224,7 @@ M = {
         -- }
         -- ```
         ---@type (mongo.ui.status.ComponentType | string | mongo.ui.status.ComponentSpec)[]
-        components = { "_current_host", "/", "_current_db", " ", "_process_state", "_running_cnt" },
+        components = { "_current_host", "/", "_current_db", " ", "_operation_state", "_running_cnt" },
 
         -- Provide your own component functions here, string key of that functoin
         -- value can be used as component name in component list.

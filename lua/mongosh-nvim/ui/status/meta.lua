@@ -18,6 +18,7 @@
 ---| "_running_cnt"
 ---| "_process_state"
 ---| "_mongosh_last_output"
+---| "_operation_state"
 
 ---@class mongo.ui.status.ComponentSpec
 ---@field [integer] string

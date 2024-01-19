@@ -53,7 +53,7 @@ M.current_host = {
 -- ----------------------------------------------------------------------------
 
 status_base.register_status_line_events(core_event, {
-    [CoreEventType.connection_successed] = function()
+    [CoreEventType.action_connect_end] = function()
         local host = api_core.get_cur_host();
         if not host then
             cur_host = nil

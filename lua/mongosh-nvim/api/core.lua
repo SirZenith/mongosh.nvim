@@ -262,6 +262,7 @@ function M.connect(args, callback)
     mongosh_state.set_password(args.password)
     mongosh_state.set_auth_source(args.auth_source)
 
+    emitter:emit(EventType.action_connect_start)
     M.run_raw_script {
         script = script_const.CMD_LIST_DBS,
         callback = function(result)
@@ -278,7 +279,7 @@ function M.connect(args, callback)
 
             callback()
 
-            emitter:emit(EventType.connection_successed)
+            emitter:emit(EventType.action_connect_end)
         end,
     }
 end
@@ -291,6 +292,8 @@ end
 ---@param callback fun(err: string?, result: string)
 ---@param  fallback_err_msg? string
 function M.do_execution(script_snippet, callback, fallback_err_msg)
+    emitter:emit(EventType.action_execute_start)
+
     M.run_script {
         script = script_snippet,
         callback = function(result)
@@ -303,6 +306,8 @@ function M.do_execution(script_snippet, callback, fallback_err_msg)
             else
                 callback(nil, str_util.trim(result.stdout))
             end
+
+            emitter:emit(EventType.action_execute_end)
         end,
     }
 end
@@ -317,7 +322,13 @@ function M.do_query(query_snippet, callback, fallback_err_msg)
         indent = tostring(config.indent_size),
     })
 
-    M.do_execution(script_snippet, callback, fallback_err_msg or "query failed")
+    emitter:emit(EventType.action_query_start)
+
+    M.do_execution(script_snippet, function(err, result)
+        callback(err, result)
+
+        emitter:emit(EventType.action_query_end)
+    end, fallback_err_msg or "query failed")
 end
 
 -- Wrap given query snippet in a query template then send it to mongosh.
@@ -331,7 +342,13 @@ function M.do_query_typed(query_snippet, callback, fallback_err_msg)
         indent = tostring(config.indent_size),
     })
 
-    M.do_execution(script_snippet, callback, fallback_err_msg or "query failed")
+    emitter:emit(EventType.action_query_start)
+
+    M.do_execution(script_snippet, function(err, result)
+        callback(err, result)
+
+        emitter:emit(EventType.action_query_end)
+    end, fallback_err_msg or "query failed")
 end
 
 -- Fill given edit snippet into `replaceOne` call template and send it to mongosh.
@@ -344,7 +361,13 @@ function M.do_replace(edit_snippet, callback, fallback_err_msg)
         indent = tostring(config.indent_size),
     })
 
-    M.do_execution(script_snippet, callback, fallback_err_msg or "replace failed")
+    emitter:emit(EventType.action_replace_start)
+
+    M.do_execution(script_snippet, function(err, result)
+        callback(err, result)
+
+        emitter:emit(EventType.action_replace_end)
+    end, fallback_err_msg or "replace failed")
 end
 
 -- Fill given update snippet into `updateOne` call template and send it to mongosh.
@@ -357,7 +380,13 @@ function M.do_update_one(update_snippet, callback, fallback_err_msg)
         indent = tostring(config.indent_size),
     })
 
-    M.do_execution(script_snippet, callback, fallback_err_msg or "update one failed")
+    emitter:emit(EventType.action_replace_start)
+
+    M.do_execution(script_snippet, function(err, result)
+        callback(err, result)
+
+        emitter:emit(EventType.action_replace_end)
+    end, fallback_err_msg or "update one failed")
 end
 
 -- ----------------------------------------------------------------------------
@@ -467,6 +496,8 @@ function M.update_collection_list(db, callback)
         return
     end
 
+    emitter:emit(EventType.action_meta_update_start)
+
     M.run_raw_script {
         script = script_const.CMD_LIST_COLLECTIONS,
         callback = function(result)
@@ -480,6 +511,8 @@ function M.update_collection_list(db, callback)
             end
 
             wrapped_callback(err)
+
+            emitter:emit(EventType.action_meta_update_end)
             emitter:emit(EventType.collection_list_update, db)
         end,
     }
