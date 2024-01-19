@@ -59,10 +59,7 @@ M.HighlightBuilder = HighlightBuilder
 function HighlightBuilder:new()
     local obj = setmetatable({}, self)
 
-    obj._cur_line = 0
-    obj._lines = {}
-
-    obj:new_line()
+    obj:reset()
 
     return obj
 end
@@ -160,6 +157,14 @@ function HighlightBuilder:build()
     end
 
     return str_lines, hl_lines
+end
+
+-- Delete content in builder, reset write head to first line.
+function HighlightBuilder:reset()
+    self._cur_line = 0
+    self._lines = {}
+
+    self:new_line()
 end
 
 -- ----------------------------------------------------------------------------
