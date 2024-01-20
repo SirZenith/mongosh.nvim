@@ -61,6 +61,7 @@ end
 ---@field name string | number
 ---@field value? any
 ---@field type string
+---@field is_card boolean # whether this entry should be drawn as a card
 --
 ---@field is_top_level boolean # whether current item is tree view root
 ---@field children? table<number | string, mongo.buffer.TreeViewItem>
@@ -162,8 +163,10 @@ function TreeViewItem:update_binded_value(value)
     end
 
     self:update_expansion_state()
+    self:update_card_flag()
 end
 
+-- Setup expansion state for special elements after binded value gets updated.
 function TreeViewItem:update_expansion_state()
     if self.is_top_level
         and self.child_table_type == NestingType.Array
@@ -173,6 +176,19 @@ function TreeViewItem:update_expansion_state()
         local children = self.children
         if children and #children == 1 then
             children[1].expanded = true
+        end
+    end
+end
+
+-- Set `is_card` flag for special elements
+function TreeViewItem:update_card_flag()
+    local children = self.children
+    if self.is_top_level
+        and self.child_table_type == NestingType.Array
+        and children
+    then
+        for _, child in ipairs(children) do
+            child.is_card = child.child_table_type == NestingType.Object
         end
     end
 end
@@ -395,9 +411,7 @@ function TreeViewItem:write_array_table(builder, indent_level)
         self:try_update_max_content_col(builder)
         builder:new_line()
 
-        local is_card = is_top_level
-            and item.expanded
-            and item.child_table_type == NestingType.Object
+        local is_card = item.expanded and item.is_card
 
         builder:write(get_type_display_name(item.type), HLGroup.ValueTypeName)
 
@@ -406,7 +420,7 @@ function TreeViewItem:write_array_table(builder, indent_level)
             builder:write(get_indent_str_by_indent_level(indent_level + 1), indent_hl_group)
         end
 
-        item:write_to_builder(builder, indent_level + 1, is_card)
+        item:write_to_builder(builder, indent_level + 1)
         if item.card_max_content_col > self.card_max_content_col then
             self.card_max_content_col = item.card_max_content_col
         end
@@ -427,9 +441,8 @@ end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
----@param is_card boolean
-function TreeViewItem:write_object_table(builder, indent_level, is_card)
-    is_card = is_card or false
+function TreeViewItem:write_object_table(builder, indent_level)
+    local is_card = self.is_card
 
     local edge_char = config.card_view.card.edge_char.left
     local nested_hl_group = get_key_hl_by_indent_level(indent_level + 1)
@@ -500,8 +513,7 @@ end
 
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level integer
----@param is_card boolean
-function TreeViewItem:write_table_value(builder, indent_level, is_card)
+function TreeViewItem:write_table_value(builder, indent_level)
     local nesting_type = self.child_table_type
 
     if not self.expanded or nesting_type == NestingType.EmptyTable then
@@ -509,7 +521,7 @@ function TreeViewItem:write_table_value(builder, indent_level, is_card)
     elseif nesting_type == NestingType.Array then
         self:write_array_table(builder, indent_level)
     elseif nesting_type == NestingType.Object then
-        self:write_object_table(builder, indent_level, is_card)
+        self:write_object_table(builder, indent_level)
     else
         builder:write("<lua-table>", HLGroup.ValueOmited)
     end
@@ -596,10 +608,8 @@ end
 -- Write tree structure into a highlight builder
 ---@param builder mongo.highlight.HighlightBuilder
 ---@param indent_level? integer
----@param is_card? boolean
-function TreeViewItem:write_to_builder(builder, indent_level, is_card)
+function TreeViewItem:write_to_builder(builder, indent_level)
     indent_level = indent_level or 0
-    is_card = is_card or false
 
     self.st_row = builder:get_line_cnt()
     self.card_st_col = 0
@@ -609,7 +619,7 @@ function TreeViewItem:write_to_builder(builder, indent_level, is_card)
     if self.child_table_type == NestingType.None then
         self:write_simple_value(builder, indent_level)
     else
-        self:write_table_value(builder, indent_level, is_card)
+        self:write_table_value(builder, indent_level)
     end
 
     self.ed_row = builder:get_line_cnt()
