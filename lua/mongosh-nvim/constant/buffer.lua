@@ -55,15 +55,16 @@ M.QueryResultStyle = {
 M.DB_SIDEBAR_FILETYPE = "MongoshNvimDBSideBar"
 
 ---@enum mongo.buffer.TreeEntryNestingType
-M.TreeEntryNestingType = {
+local TreeEntryNestingType = {
     Object = "object",
     Array = "array",
     EmptyTable = "empty_table",
     None = "none",
 }
+M.TreeEntryNestingType = TreeEntryNestingType
 
 ---@enum mongo.buffer.BSONValueType
-M.BSONValueType = {
+local BSONValueType = {
     -- ------------------------------------------------------------------------
     -- plain value
     Unknown   = "unknown",
@@ -87,6 +88,13 @@ M.BSONValueType = {
     ObjectID  = "object_id", -- { $oid: string }
     Regex     = "regex",     -- { $regularExpression: { pattern: string, options: string } }
     Timestamp = "timestamp", -- { $timestamp: { t: integer, i: integer } }
+}
+M.BSONValueType = BSONValueType
+
+---@type table<mongo.buffer.TreeEntryNestingType, mongo.buffer.BSONValueType>
+M.NESTING_TYPE_TO_VALUE_TYPE = {
+    [TreeEntryNestingType.Array] = BSONValueType.Array,
+    [TreeEntryNestingType.Object] = BSONValueType.Object,
 }
 
 return M

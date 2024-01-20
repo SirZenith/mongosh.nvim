@@ -13,6 +13,7 @@ local card_util = require "mongosh-nvim.state.buffer.buffer_query_result_card.ut
 
 local ValueType = buffer_const.BSONValueType
 local NestingType = buffer_const.TreeEntryNestingType
+local NESTING_TYPE_TO_VALUE_TYPE = buffer_const.NESTING_TYPE_TO_VALUE_TYPE
 local HLGroup = hl_const.HighlightGroup
 
 local COMPOSED_TYPE_IDENT_KEY = card_bson_types.COMPOSED_TYPE_IDENT_KEY
@@ -64,7 +65,7 @@ end
 ---@field is_card boolean # whether this entry should be drawn as a card
 --
 ---@field is_top_level boolean # whether current item is tree view root
----@field children? table<number | string, mongo.buffer.TreeViewItem>
+---@field children? mongo.buffer.TreeViewItem[]
 ---@field child_table_type mongo.buffer.TreeEntryNestingType
 ---@field parent? mongo.buffer.TreeViewItem
 --
@@ -77,7 +78,6 @@ end
 --
 ---@field card_st_col integer # 1-base column index, recording starting point of object card
 ---@field card_max_content_col integer # 1-base column index, recording position of last character of longest card content line.
----@field obj_key_show_order? (string | number)[] # display order of object field used during last write.
 local TreeViewItem = {}
 TreeViewItem.__index = TreeViewItem
 
@@ -104,61 +104,33 @@ function TreeViewItem:update_binded_value(value)
     self.child_depth = 0
     self.child_table_type = NestingType.None
 
-    self.value = value
+    self.value = nil
     self.type = ValueType.Unknown
 
     local value_t = type(value)
     if value_t ~= "table" then
         -- simple type
-        self.type = SIMPLE_TYPE_MAP[value_t] or ValueType.Unknown
-        if self.type == ValueType.Unknown then
-            self.value = nil
-        end
+        local type = SIMPLE_TYPE_MAP[value_t] or ValueType.Unknown
+        self.type = type
+        self.value = type ~= ValueType.Unknown and value or nil
+        self.children = nil
     else
-        -- BSON type
+        local type = ValueType.Unknown
         for key, type_name in pairs(COMPOSED_TYPE_IDENT_KEY) do
             if value[key] then
-                self.type = type_name
+                type = type_name
                 break
             end
         end
 
-        if self.type == ValueType.Unknown then
-            -- array or object value
-            local children = self.children
-            if not children then
-                children = {}
-                self.children = children
-            end
-
-            -- update children value
-            for k, v in pairs(value) do
-                local child = children[k]
-                if child then
-                    child:update_binded_value(v)
-                else
-                    child = TreeViewItem:new(v)
-                    children[k] = child
-                    child.name = k
-                    child.parent = self
-                end
-            end
-
-            -- remove deleted children
-            for k in pairs(children) do
-                if value[k] == nil then
-                    children[k] = nil
-                end
-            end
-
-            self.value = nil
-            self.child_table_type = self:get_nested_table_type()
-
-            if self.child_table_type == NestingType.Array then
-                self.type = ValueType.Array
-            elseif self.child_table_type == NestingType.Object then
-                self.type = ValueType.Object
-            end
+        if type == ValueType.Unknown then
+            -- JSON array or object
+            self:load_child_value(value)
+        else
+            -- BSON type
+            self.type = type
+            self.value = value
+            self.children = nil
         end
     end
 
@@ -166,11 +138,59 @@ function TreeViewItem:update_binded_value(value)
     self:update_card_flag()
 end
 
+-- Load JSON array and object as tree structure.
+function TreeViewItem:load_child_value(value)
+    local old_children = self.children
+
+    local child_map = {}
+    if old_children then
+        for _, child in ipairs(old_children) do
+            local key = child.name
+
+            if value[key] ~= nil then
+                child_map[key] = child
+            end
+        end
+    end
+
+    -- merging new values
+    for k, v in pairs(value) do
+        local child = child_map[k]
+        if child then
+            child:update_binded_value(v)
+        else
+            child = TreeViewItem:new(v)
+            child_map[k] = child
+            child.name = k
+            child.parent = self
+        end
+    end
+
+    -- load new children
+    local keys = {}
+    for k in pairs(child_map) do
+        keys[#keys + 1] = k
+    end
+    table.sort(keys)
+
+    local children = {}
+    for _, k in ipairs(keys) do
+        children[#children + 1] = child_map[k]
+    end
+    self.children = children
+
+    -- determine value type
+    local nesting_type = self:get_nested_table_type()
+    local value_type = NESTING_TYPE_TO_VALUE_TYPE[nesting_type] or ValueType.Unknown
+
+    self.type = value_type
+    self.value = nil
+    self.child_table_type = nesting_type
+end
+
 -- Setup expansion state for special elements after binded value gets updated.
 function TreeViewItem:update_expansion_state()
-    if self.is_top_level
-        and self.child_table_type == NestingType.Array
-    then
+    if self.is_top_level then
         self.expanded = true
 
         local children = self.children
@@ -206,7 +226,7 @@ function TreeViewItem:get_child_depth()
     if not children then return 0 end
 
     local max_depth = 0
-    for _, child in pairs(children) do
+    for _, child in ipairs(children) do
         local depth = child:get_child_depth() + 1
         if depth > max_depth then
             max_depth = depth
@@ -249,7 +269,7 @@ function TreeViewItem:set_folding_level(level)
     local cur_depth = self:get_child_depth()
     local max_sibling_depth = cur_depth
     if siblings then
-        for _, sibling in pairs(siblings) do
+        for _, sibling in ipairs(siblings) do
             local depth = sibling:get_child_depth()
             if depth > max_sibling_depth then
                 depth = depth
@@ -306,24 +326,19 @@ function TreeViewItem:get_nested_table_type()
     local children = self.children
     if not children then return NestingType.None end
 
-    local cnt = 0
-    for _ in pairs(children) do
-        cnt = cnt + 1
-    end
-
-    if cnt == 0 then
+    if #children == 0 then
         return NestingType.EmptyTable
     end
 
-    local continous = true
-    for i = 1, cnt do
-        if children[i] == nil then
-            continous = false
+    local is_numeric_indexed = true
+    for i, child in ipairs(children) do
+        if child.name ~= i then
+            is_numeric_indexed = false
             break
         end
     end
 
-    return continous and NestingType.Array or NestingType.Object
+    return is_numeric_indexed and NestingType.Array or NestingType.Object
 end
 
 -- Read current line length from builder. If line length is greater than recorded
@@ -366,11 +381,8 @@ function TreeViewItem:write_collapsed_table(builder, indent_level)
         end
     elseif nesting_type == NestingType.Object then
         lhs, rhs = "{", "}"
-        if children then
-            for _ in pairs(children) do
-                digest = "..."
-                break
-            end
+        if children and #children > 0 then
+            digest = "..."
         end
     elseif nesting_type == NestingType.EmptyTable then
         digest = "empty-table"
@@ -449,16 +461,7 @@ function TreeViewItem:write_object_table(builder, indent_level)
     local key_hl_group = get_key_hl_by_indent_level(indent_level)
 
     local children = self.children or {}
-    local keys = {}
-    if children then
-        for k in pairs(self.children) do
-            keys[#keys + 1] = k
-        end
-        table.sort(keys)
-    end
-    self.obj_key_show_order = keys
-
-    local child_cnt = #keys
+    local child_cnt = #children
 
     if not is_card then
         if self.is_top_level then
@@ -470,8 +473,7 @@ function TreeViewItem:write_object_table(builder, indent_level)
     end
 
     for i = 1, child_cnt do
-        local key = keys[i]
-        local item = children[key]
+        local item = children[i]
 
         self:try_update_max_content_col(builder)
         builder:new_line()
@@ -486,7 +488,7 @@ function TreeViewItem:write_object_table(builder, indent_level)
             or key_hl_group
         builder:write(edge_char, edge_hl_group)
         builder:write(get_indent_str_by_indent_level(indent_level + 1), HLGroup.TreeNormal)
-        builder:write(tostring(key), key_hl_group)
+        builder:write(tostring(item.name), key_hl_group)
         builder:write(": ", HLGroup.TreeNormal)
         item:write_to_builder(builder, indent_level + 1)
 
@@ -614,7 +616,6 @@ function TreeViewItem:write_to_builder(builder, indent_level)
     self.st_row = builder:get_line_cnt()
     self.card_st_col = 0
     self.card_max_content_col = 0
-    self.obj_key_show_order = nil
 
     if self.child_table_type == NestingType.None then
         self:write_simple_value(builder, indent_level)
@@ -654,7 +655,7 @@ function TreeViewItem:on_selected(at_row)
 
     local children = self.children
     if children and self.expanded then
-        for _, item in pairs(children) do
+        for _, item in ipairs(children) do
             updated = item:on_selected(at_row)
 
             if updated then
@@ -705,7 +706,14 @@ function TreeViewItem:find_id_field_by_row_num(row)
     if nesting_type == NestingType.Object then
         -- Searching stops at outter most layer of object entry. `_id` field
         -- nested field value of object should be ignored.
-        local item = children._id
+        local item
+        for _, child in ipairs(children) do
+            if child.name == "_id" then
+                item = child
+                break
+            end
+        end
+
         if item then
             value = item.value
             target = self
@@ -743,13 +751,10 @@ function TreeViewItem:get_field_by_row_num(row)
     local children = self.children
     if not children then return nil end
 
-    local ordered_keys = self.obj_key_show_order
-    local total_cnt = ordered_keys and #ordered_keys or #children
+    local total_cnt = #children
 
     for i = 1, total_cnt do
-        local key = ordered_keys and ordered_keys[i] or i
-
-        local child = children[key]
+        local child = children[i]
         if child.st_row > row then
             break
         end
@@ -795,11 +800,6 @@ function TreeViewItem:find_edit_target(row)
 
     if not item.expanded then
         return "can't not edit collapsed entry", nil
-    end
-
-    local ordered_keys = item.obj_key_show_order
-    if not ordered_keys then
-        return "curent entry lacks field display order infomation", nil
     end
 
     local field = item:get_field_by_row_num(row)
