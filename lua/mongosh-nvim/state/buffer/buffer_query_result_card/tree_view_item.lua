@@ -171,7 +171,8 @@ function TreeViewItem:load_child_value(value)
 
     local child_map = {}
     if old_children then
-        for _, child in ipairs(old_children) do
+        for i = 1, #old_children do
+            local child = old_children[i]
             local key = child.name
 
             if value[key] ~= nil then
@@ -206,7 +207,8 @@ function TreeViewItem:load_child_value(value)
     table.sort(keys)
 
     local children = {}
-    for _, k in ipairs(keys) do
+    for i = 1, #keys do
+        local k = keys[i]
         children[#children + 1] = child_map[k]
     end
 
@@ -241,7 +243,8 @@ function TreeViewItem:update_card_flag()
         and self.child_table_type == NestingType.Array
         and children
     then
-        for _, child in ipairs(children) do
+        for i = 1, #children do
+            local child = children[i]
             child.is_card = child.child_table_type == NestingType.Object
         end
     end
@@ -266,7 +269,8 @@ function TreeViewItem:get_display_height()
         display_height = 1
     else
         display_height = 2 -- 2 lines for brackets and braces
-        for _, child in ipairs(children) do
+        for i = 1, #children do
+            local child = children[i]
             display_height = display_height + child:get_display_height()
         end
     end
@@ -288,7 +292,8 @@ function TreeViewItem:mark_display_height_dirty_recursive()
     local children = self.children
     if not children then return end
 
-    for _, child in ipairs(children) do
+    for i = 1, #children do
+        local child = children[i]
         child:mark_display_height_dirty_recursive()
     end
 end
@@ -302,7 +307,8 @@ function TreeViewItem:update_display_range(cur_row)
     local children = self.children
     if self.expanded and children then
         cur_row = cur_row + 1 -- plus one because of `[` and `{`
-        for _, child in ipairs(children) do
+        for i = 1, #children do
+            local child = children[i]
             cur_row = child:update_display_range(cur_row)
         end
     end
@@ -359,7 +365,8 @@ function TreeViewItem:_debug_print_display_range(indent)
 
     local children = self.children
     if children then
-        for _, child in ipairs(children) do
+        for i = 1, #children do
+            local child = children[i]
             child:_debug_print_display_range(indent)
         end
     end
@@ -475,7 +482,8 @@ function TreeViewItem:get_nested_table_type()
     end
 
     local is_numeric_indexed = true
-    for i, child in ipairs(children) do
+    for i = 1, #children do
+        local child = children[i]
         if child.name ~= i then
             is_numeric_indexed = false
             break
@@ -872,7 +880,8 @@ function TreeViewItem:on_selected(at_row)
 
     local updated = false
     if children and self.expanded then
-        for _, item in ipairs(children) do
+        for i = 1, #children do
+            local item = children[i]
             updated = item:on_selected(at_row)
             if updated then break end
         end
@@ -916,7 +925,8 @@ function TreeViewItem:find_id_field_by_row_num(row)
         -- Searching stops at outter most layer of object entry. `_id` field
         -- nested field value of object should be ignored.
         local item
-        for _, child in ipairs(children) do
+        for i = 1, #children do
+            local child = children[i]
             if child.name == "_id" then
                 item = child
                 break
@@ -928,7 +938,8 @@ function TreeViewItem:find_id_field_by_row_num(row)
             target = self
         end
     elseif nesting_type == NestingType.Array then
-        for _, item in ipairs(children) do
+        for i = 1, #children do
+            local item = children[i]
             value, target = item:find_id_field_by_row_num()
             if value ~= nil and target ~= nil then
                 break

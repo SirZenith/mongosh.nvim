@@ -14,7 +14,8 @@ local M = {}
 ---@return mongo.highlight.HLItem[] hl_items
 function M.update_hl_items_range(text_segments, hl_items)
     local pos = 0
-    for i, item in ipairs(hl_items) do
+    for i = 1, #hl_items do
+        local item = hl_items[i]
         local text = text_segments[i]
         item.st = pos
 
@@ -32,10 +33,12 @@ end
 function M.add_hl_to_buffer(bufnr, st_line, hl_lines)
     local add_hl = api.nvim_buf_add_highlight
 
-    for i, line in ipairs(hl_lines) do
+    for i = 1, #hl_lines do
+        local line = hl_lines[i]
         local line_num = st_line + i - 1
 
-        for _, item in ipairs(line) do
+        for j = 1, #line do
+            local item = line[j]
             add_hl(bufnr, 0, item.name, line_num, item.st, item.ed)
         end
     end
@@ -108,7 +111,9 @@ function HighlightBuilder:get_cur_line_len()
     if not line then return 0 end
 
     local sum = 0
-    for _, part in ipairs(line.parts) do
+    local parts = line.parts
+    for i = 1, #parts do
+        local part = parts[i]
         sum = sum + part:len()
     end
     return sum
@@ -121,7 +126,9 @@ function HighlightBuilder:get_cur_line_display_width()
     if not line then return 0 end
 
     local sum = 0
-    for _, part in ipairs(line.parts) do
+    local parts = line.parts
+    for i = 1, #parts do
+        local part = parts[i]
         sum = sum + vim.fn.strdisplaywidth(part)
     end
     return sum
@@ -166,7 +173,8 @@ function HighlightBuilder:build_line(line_num)
 
     local sum = 0
     local hl_items = {}
-    for i, hl_group in ipairs(hl_groups) do
+    for i = 1, #hl_groups do
+        local hl_group = hl_groups[i]
         local ed = sum + parts[i]:len()
         hl_items[#hl_items + 1] = { name = hl_group, st = sum, ed = ed }
         sum = ed
