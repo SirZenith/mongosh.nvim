@@ -182,11 +182,25 @@ local function setup_events(mbuf)
     end
 
     -- refresh content on move
+    local old_pos = 0
     vim.api.nvim_create_autocmd("CursorMoved", {
         buffer = bufnr,
         callback = function()
             local _, tree_item = try_get_tree_item(mbuf)
             if not tree_item then return end
+
+            local winnr = buffer_util.get_win_by_buf(bufnr, true)
+            if not winnr then return end
+
+            local st_row = vim.api.nvim_win_call(winnr, function()
+                return vim.fn.getpos("w0")[2]
+            end)
+
+            if st_row == old_pos then
+                return
+            end
+
+            old_pos = st_row
             update_tree_to_buffer(bufnr, tree_item)
         end
     })
