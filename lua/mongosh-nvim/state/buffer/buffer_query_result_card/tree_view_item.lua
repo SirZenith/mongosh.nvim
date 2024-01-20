@@ -181,6 +181,7 @@ function TreeViewItem:load_child_value(value)
     end
 
     -- merging new values
+    local max_depth = 0
     for k, v in pairs(value) do
         local child = child_map[k]
         if child then
@@ -189,6 +190,11 @@ function TreeViewItem:load_child_value(value)
             child = TreeViewItem:new(v, self)
             child_map[k] = child
             child.name = k
+        end
+
+        local depth = child.child_depth + 1
+        if depth > max_depth then
+            max_depth = depth
         end
     end
 
@@ -203,7 +209,9 @@ function TreeViewItem:load_child_value(value)
     for _, k in ipairs(keys) do
         children[#children + 1] = child_map[k]
     end
+
     self.children = children
+    self.child_depth = max_depth
 
     -- determine value type
     local nesting_type = self:get_nested_table_type()
@@ -237,31 +245,6 @@ function TreeViewItem:update_card_flag()
             child.is_card = child.child_table_type == NestingType.Object
         end
     end
-end
-
--- Find maximun nesting level in current entry, entry with no children has depth
--- 0, entry with direct children has depth 1, if those children also children
--- entry will be depth 2, and so on.
----@return integer
-function TreeViewItem:get_child_depth()
-    if self.child_depth > 0 then
-        return self.child_depth
-    end
-
-    local children = self.children
-    if not children then return 0 end
-
-    local max_depth = 0
-    for _, child in ipairs(children) do
-        local depth = child:get_child_depth() + 1
-        if depth > max_depth then
-            max_depth = depth
-        end
-    end
-
-    self.child_depth = max_depth
-
-    return max_depth
 end
 
 -- Compute number of lines needed to write current entry into buffer. Result will
@@ -388,6 +371,37 @@ function TreeViewItem:toggle_expansion()
     self:display_height_changed()
 end
 
+---@param level integer
+---@param max_sibling_depth integer # maximum depth among sibling entries.
+---@return boolean updated
+function TreeViewItem:_set_folding_level(level, max_sibling_depth)
+    local cur_depth = self.child_depth
+
+    -- Having a deeper nested sibling is equivalent to have a smaller folding
+    -- level for current entry and its children.
+    level = level - (max_sibling_depth - cur_depth)
+
+    local expaneded = cur_depth > level
+    local updated = self.expanded ~= expaneded
+
+    self.expanded = expaneded
+    self.folding_level = level > 0 and level or 0
+
+    local children = self.children
+    if children then
+        for i = 1, #children do
+            updated = children[i]:_set_folding_level(level, cur_depth - 1) or updated
+        end
+    end
+
+    if updated and not self.parent then
+        self:mark_display_height_dirty_recursive()
+        self:update_display_range(1)
+    end
+
+    return updated
+end
+
 -- Set folding level of current entry. As folding level gets higher, the outter
 -- layer of entry gets folded.
 -- If expansion state changed after change of folding level, `true` will be
@@ -395,45 +409,22 @@ end
 ---@param level integer
 ---@return boolean updated
 function TreeViewItem:set_folding_level(level)
-    if level < 0 then return false end
+    return self:_set_folding_level(level, self.child_depth)
+end
+
+-- Expand current entry and all of its children.
+---@return boolean updated # `true` when expansion state changed.
+function TreeViewItem:expand_all()
+    local updated = not self.expanded
+
+    self.expanded = true
+    self.folding_level = 0
 
     local children = self.children
-    if not children then return false end
-
-    if not self.expanded and level > self.folding_level then
-        return false
-    end
-
-    self.folding_level = level
-
-    local parent = self.parent
-    local siblings = parent and parent.children
-
-    -- All elements at the same indent level gets folded together. Deepest entry
-    -- shres its depth with sibling entries.
-    local cur_depth = self:get_child_depth()
-    local max_sibling_depth = cur_depth
-    if siblings then
-        for _, sibling in ipairs(siblings) do
-            local depth = sibling:get_child_depth()
-            if depth > max_sibling_depth then
-                depth = depth
-            end
+    if children then
+        for i = 1, #children do
+            updated = children[i]:expand_all() or updated
         end
-    end
-
-    -- Having a deeper nested sibling is equivalent to have a smaller folding
-    -- level for current entry and its children.
-    local equivalent_level = level - (max_sibling_depth - cur_depth)
-
-    local expaneded = cur_depth > level
-    local updated = self.expanded ~= expaneded
-
-    self.expanded = expaneded
-
-    for _, child in pairs(children) do
-        local child_updated = child:set_folding_level(equivalent_level)
-        updated = updated or child_updated
     end
 
     if updated then
@@ -447,31 +438,31 @@ function TreeViewItem:set_folding_level(level)
     return updated
 end
 
--- Expand current entry and all of its children.
----@return boolean updated # `true` when expansion state changed.
-function TreeViewItem:expand_all()
-    return self:set_folding_level(0)
-end
-
 -- Fold current entry and all of its children.
 ---@return boolean upated # `true` when expansion state changed.
 function TreeViewItem:fold_all()
-    local cur_depth = self:get_child_depth()
+    local updated = self.expanded
 
-    local parent = self.parent
-    local siblings = parent and parent.children
+    self.expanded = false
+    self.folding_level = self.child_depth + 1
 
-    local max_sibling_depth = cur_depth
-    if siblings then
-        for _, sibling in pairs(siblings) do
-            local depth = sibling:get_child_depth()
-            if depth > max_sibling_depth then
-                depth = depth
-            end
+    local children = self.children
+    if children then
+        for i = 1, #children do
+            updated = children[i]:fold_all() or updated
         end
     end
 
-    return self:set_folding_level(max_sibling_depth)
+
+    if updated then
+        self:mark_display_height_dirty()
+
+        if not self.parent then
+            self:update_display_range(1)
+        end
+    end
+
+    return updated
 end
 
 ---@return mongo.buffer.TreeEntryNestingType
