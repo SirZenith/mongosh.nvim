@@ -3,6 +3,7 @@ local buffer_const = require "mongosh-nvim.constant.buffer"
 local config = require "mongosh-nvim.config"
 local log = require "mongosh-nvim.log"
 local util = require "mongosh-nvim.util"
+local buffer_util = require "mongosh-nvim.util.buffer"
 
 local TreeViewItem = require "mongosh-nvim.state.buffer.buffer_query_result_card.tree_view_item"
 
@@ -23,7 +24,7 @@ local function update_tree_to_buffer(bufnr, tree_item)
     bo.modifiable = false
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 ---@return integer? bufnr
 ---@return mongo.buffer.TreeViewItem?
 local function try_get_tree_item(mbuf)
@@ -35,7 +36,7 @@ local function try_get_tree_item(mbuf)
     return bufnr, tree_item
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 local function update_tree_view(mbuf, typed_json)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -61,13 +62,10 @@ local function update_tree_view(mbuf, typed_json)
     bo.modifiable = false
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 local function toggle_entry_expansion(mbuf)
-    local bufnr = mbuf:get_bufnr()
-    if not bufnr then return end
-
-    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
-    if not tree_item then return end
+    local bufnr, tree_item = try_get_tree_item(mbuf)
+    if not bufnr or not tree_item then return end
 
     local bo = vim.bo[bufnr]
     bo.modifiable = true
@@ -75,18 +73,15 @@ local function toggle_entry_expansion(mbuf)
     bo.modifiable = false
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 local function try_edit_field(mbuf)
-    local bufnr = mbuf:get_bufnr()
-    if not bufnr then return end
-
     local collection = mbuf._state_args.collection
     if not collection then
         log.warn "no collection binded with current buffer"
     end
 
-    local tree_item = mbuf._state_args.tree_item ---@type mongo.buffer.TreeViewItem?
-    if not tree_item then return end
+    local bufnr, tree_item = try_get_tree_item(mbuf)
+    if not bufnr or not tree_item then return end
 
     util.do_async_steps {
         function(next_step)
@@ -109,9 +104,9 @@ local function try_edit_field(mbuf)
     }
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 ---@param offset integer
-local function chnage_foldingy_level(mbuf, offset)
+local function change_folding_level(mbuf, offset)
     local bufnr, tree_item = try_get_tree_item(mbuf)
     if not bufnr or not tree_item then
         return
@@ -124,7 +119,7 @@ local function chnage_foldingy_level(mbuf, offset)
     end
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 local function fold_all(mbuf)
     local bufnr, tree_item = try_get_tree_item(mbuf)
     if not bufnr or not tree_item then
@@ -136,7 +131,7 @@ local function fold_all(mbuf)
     end
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 local function expand_all(mbuf)
     local bufnr, tree_item = try_get_tree_item(mbuf)
     if not bufnr or not tree_item then
@@ -148,7 +143,7 @@ local function expand_all(mbuf)
     end
 end
 
----@param mbuf mongo.buffe.MongoBuffer
+---@param mbuf mongo.buffer.MongoBuffer
 local function set_up_buffer_keybinding(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -172,10 +167,10 @@ local function set_up_buffer_keybinding(mbuf)
     local fold_key = key_cfg.folding
     local fold_mapping = {
         [fold_key.fold_less] = function()
-            chnage_foldingy_level(mbuf, -1)
+            change_folding_level(mbuf, -1)
         end,
         [fold_key.fold_more] = function()
-            chnage_foldingy_level(mbuf, 1)
+            change_folding_level(mbuf, 1)
         end,
         [fold_key.expand_all] = function()
             expand_all(mbuf)
@@ -189,6 +184,7 @@ local function set_up_buffer_keybinding(mbuf)
     end
 end
 
+---@param mbuf mongo.buffer.MongoBuffer
 local function clear_buffer_keybinding(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
@@ -232,6 +228,22 @@ function M.on_enter(mbuf)
     bo.modifiable = false
 
     set_up_buffer_keybinding(mbuf)
+end
+
+function M.on_show(mbuf)
+    local bufnr, tree_item = try_get_tree_item(mbuf)
+    if not bufnr or not tree_item then
+        return
+    end
+
+    local winnr = buffer_util.get_win_by_buf(bufnr, true)
+    if winnr then
+        local wo = vim.wo[winnr]
+        wo.number = false
+        wo.relativenumber = false
+    end
+
+    update_tree_to_buffer(bufnr, tree_item)
 end
 
 function M.on_leave(mbuf)
