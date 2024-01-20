@@ -268,6 +268,7 @@ function M.connect(args, callback)
         callback = function(result)
             if result.code ~= 0 then
                 callback("failed to connect to host\n" .. result.stderr)
+                emitter:emit(EventType.action_connect_end)
                 return
             end
 
@@ -303,10 +304,11 @@ function M.do_execution(script_snippet, callback, fallback_err_msg)
                     err = fallback_err_msg or "execution failed"
                 end
                 callback(result.stderr, "")
-            else
-                callback(nil, str_util.trim(result.stdout))
+                emitter:emit(EventType.action_execute_end)
+                return
             end
 
+            callback(nil, str_util.trim(result.stdout))
             emitter:emit(EventType.action_execute_end)
         end,
     }
