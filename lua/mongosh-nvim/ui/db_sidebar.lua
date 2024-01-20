@@ -17,7 +17,7 @@ local M = {}
 
 ---@class mongo.ui.SidebarWriteInfo
 ---@field line string
----@field hl_items mongo.higlight.HLItem[]
+---@field hl_items mongo.highlight.HLItem[]
 
 ---@class mongo.ui.DBSideItem
 ---@field name string

@@ -1,3 +1,5 @@
+local log = require "mongosh-nvim.log"
+
 local M = {}
 
 -- caps_to_table converts query captures into Lua table
@@ -29,7 +31,7 @@ function M.walk_through_node(contex, node)
     local visited = contex.visited
     if visited then
         if visited[type] then
-            vim.print("repeated: " .. type)
+            log.warn("repeated visit on: " .. type)
             return
         else
             contex.visited[type] = true

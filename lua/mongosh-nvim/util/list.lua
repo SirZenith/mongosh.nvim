@@ -44,4 +44,21 @@ function M.list_map_in_place(list, mapper)
     end
 end
 
+-- Find certain value in list, if found return element index, else return 0
+---@param list any[]
+---@param target any
+---@return integer
+function M.find(list, target)
+    local index = 0
+
+    for i, value in ipairs(list) do
+        if target == value then
+            index = i
+            break
+        end
+    end
+
+    return index
+end
+
 return M

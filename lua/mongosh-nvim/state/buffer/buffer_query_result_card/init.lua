@@ -45,8 +45,6 @@ local function update_tree_view(mbuf, typed_json)
     if not tree_item then
         tree_item = TreeViewItem:new()
         mbuf._state_args.tree_item = tree_item
-
-        tree_item.is_top_level = true
     end
 
     local ok, value = xpcall(function()
@@ -144,7 +142,7 @@ local function expand_all(mbuf)
 end
 
 ---@param mbuf mongo.buffer.MongoBuffer
-local function set_up_buffer_keybinding(mbuf)
+local function setup_events(mbuf)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -182,6 +180,16 @@ local function set_up_buffer_keybinding(mbuf)
     for key, callback in pairs(fold_mapping) do
         vim.keymap.set("n", key, callback, options)
     end
+
+    -- refresh content on move
+    vim.api.nvim_create_autocmd("CursorMoved", {
+        buffer = bufnr,
+        callback = function()
+            local _, tree_item = try_get_tree_item(mbuf)
+            if not tree_item then return end
+            update_tree_to_buffer(bufnr, tree_item)
+        end
+    })
 end
 
 ---@param mbuf mongo.buffer.MongoBuffer
@@ -227,7 +235,7 @@ function M.on_enter(mbuf)
     bo.filetype = FileType.QueryResultCard
     bo.modifiable = false
 
-    set_up_buffer_keybinding(mbuf)
+    setup_events(mbuf)
 end
 
 function M.on_show(mbuf)

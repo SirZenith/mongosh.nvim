@@ -234,7 +234,7 @@ function MongoBuffer:init_autocmd()
     api.nvim_create_autocmd("BufUnload", {
         buffer = bufnr,
         callback = function()
-            self:destory()
+            self:destroy()
         end
     })
 end
@@ -275,7 +275,7 @@ function MongoBuffer:reset_buf_options()
 end
 
 -- destory does clean up on buffer gets unloaded
-function MongoBuffer:destory()
+function MongoBuffer:destroy()
     local bufnr = self:get_bufnr()
     if not bufnr then return end
 
