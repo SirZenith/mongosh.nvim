@@ -48,7 +48,7 @@ Default config value and introduction of each option can be found [here](https:/
 
 ## Usage
 
-Check out `:help mongosh-nvim` for documentation.
+Check out `:help mongosh-nvim` or [this doc](./doc/mongosh-nvim.md).
 
 Basically, this plugin provides command `:Mongo` as entrance, and several
 subcommands that actually do something.
