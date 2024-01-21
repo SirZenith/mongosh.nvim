@@ -60,6 +60,8 @@ function M.content_writer(mbuf, callback)
             return
         end
 
+        mbuf._state_args.snippet = snippet
+
         mbuf:set_lines(response)
 
         callback()

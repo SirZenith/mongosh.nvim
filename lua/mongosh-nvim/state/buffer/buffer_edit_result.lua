@@ -48,6 +48,8 @@ function M.content_writer(mbuf, callback)
             return
         end
 
+        mbuf._state_args.snippet = snippet
+
         if result == "" then
             result = util.get_time_str() .. " - " .. "execution successed"
         end

@@ -18,7 +18,7 @@ M.HighlightGroup = {
     CollectionLoadingSymbol = "MongoshCollectionLoadingSymbol",
 
     -- ------------------------------------------------------------------------
-    -- Tree View
+    -- Card View
     TreeNormal              = "MongoshTreeNormal",
     TreeIndented            = "MongoshTreeIndented",
 

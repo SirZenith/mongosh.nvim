@@ -164,6 +164,7 @@ function M.run_buffer_edit(bufnr, args)
 
     local supported_types = {
         [BufferType.QueryResult] = true,
+        [BufferType.QueryResultCard] = true,
         [BufferType.Edit] = true,
     }
 
