@@ -165,16 +165,16 @@ be written buffer until they are visible in window.
 
 Highlight groups used in card view are:
 
-- MongoshTreeNormal, for normal text in card view.
-- MongoshValueTypeName, for name of data type.
-- MongoshValueBoolean, for boolean literal.
-- MongoshValueNull, for `null` literal.
-- MongoshValueNumber, for numberic literal.
-- MongoshValueString, for string literal.
-- MongoshValueObject, for representation of some BSON type value, e.g. binary,.
-- MongoshValueOmited, for some elements like ellipsis.
-- MongoshValueRegex, for regular expression literal.
-- MongoshValueUnknown, for unrecognized value.
+- `MongoshTreeNormal`, for normal text in card view.
+- `MongoshValueTypeName`, for name of data type.
+- `MongoshValueBoolean`, for boolean literal.
+- `MongoshValueNull`, for `null` literal.
+- `MongoshValueNumber`, for numberic literal.
+- `MongoshValueString`, for string literal.
+- `MongoshValueObject`, for representation of some BSON type value, e.g. binary,.
+- `MongoshValueOmited`, for some elements like ellipsis.
+- `MongoshValueRegex`, for regular expression literal.
+- `MongoshValueUnknown`, for unrecognized value.
 
 Card view provides some fold operation, default key maps are:
 
@@ -468,7 +468,7 @@ Supported highlight groups are:
 - `MongoshCollectionLoading`, color of loading place holder text.
 - `MongoshCollectionLoadingSymbol`, color of loading indicator.
 
-# Status Line Component
+# Status Line
 
 Plugin provides a [lualine.nvim](https://github.com/nvim-lualine/lualine.nvim)
 component for displaying plugin state in status line.
@@ -477,3 +477,185 @@ Status line information is composed by child components, by default, on active
 window, mongosh.nvim shows names of current host, database currently connected
 to, operation state of plugin, and number of running mongosh process; on
 inactive window, only database name and operation state are shown.
+
+Each component is a function that returns string, you can provide your own
+component in plugin config if you like.
+
+Enabled components are given by a list of component specification. `spec` is
+either a string or a table.
+
+When `spec` is given by string, plugin will first treat it as component name,
+and try to find custom component or built-in component with that name, if a
+custom component has the same name as built-in one, custom component is prefered.
+
+If no component's name matches given string, then this string is used as literal,
+and will be concatenate directly to other parts.
+
+When `spec` is table, plugin will used `spec[1]` as component name. If not
+component is found using that name, this `spec` will be ignored.
+
+When mathing component is found, `spec` will be passed to component function as
+argument every time component gets invoked.
+
+For example, you can have following status line setting:
+
+```lua
+require "mongosh-nvim".setup {
+    status_line = {
+        components = {
+            -- components used in status line active window
+            active = {
+                -- this will show something like "localhost:27017/foo"
+                "_current_host", "/", "_current_db",
+            },
+            -- components used in inactive window
+            inactive = {
+                { -- the same built-in component but shorter.
+                    "_current_host",
+                    max_width = 10,
+                }
+            },
+        },
+    },
+}
+```
+
+## Custom Component
+
+Status line content is generated lazyly, once there is cached value, plugin
+won't generates another string, the same value is reused when lualine does
+refreshing.
+
+If you want to write your own component, you must tell plugin when the cached
+should be out of date. You do that by call `set_status_line_dirty()` with
+autocommand, keybindding, events, etc..
+
+An example component for showing time used for connection:
+
+```lua
+local api_constant = require "mongosh-nvim.constant.api"
+local api_core = require "mongosh-nvim.api.core"
+local status_base = require "mongosh-nvim.ui.status.base"
+
+local CoreEventType = api_constant.CoreEventType
+local core_event = api_core.emitter
+
+local time_cache = 0
+
+-- component function
+local function connection_clock(args)
+    if time_cache <= 0 then return "" end
+
+    local format = args and args.format or "%d"
+    local duration = os.clock() - time_cache
+
+    return format:format(duration)
+end
+
+-- registering events
+core_event:on(CoreEventType.action_connect_end, function()
+    time_cache = 0
+    status_base.set_status_line_dirty()
+end)
+core_event:on(CoreEventType.action_connect_start, function()
+    time_cache = os.clock()
+    status_base.set_status_line_dirty()
+end)
+```
+
+You can register and enable component implementation above like this:
+
+```lua
+require "mongosh-nvim".setup {
+    status_line = {
+        components = {
+            active = {
+                {
+                    "connection_clock",
+                    format = "Connecting: %d",
+                }
+            },
+        },
+        custom_components = {
+            connection_clock = connection_clock,
+        },
+    },
+}
+```
+
+## Built-in
+
+Plugin provides some built-in component, this section list their names and
+argument they supports along with default value of each arguments, in form of
+component specification.
+
+All built-in component names start with a `_`.
+
+- `_current_db`, shows database used for current connection.
+
+```lua
+{
+    "_current_db",
+    max_width = 20, -- max display width of database name
+}
+```
+
+- `_current_host`, shows host name currently connected to.
+
+```lua
+{
+    "_current_host",
+    max_width = 20, -- max display width of host name
+}
+```
+
+- `_operation_state`, shows plugin runnig state. Each state is mapped string or
+  a list of string. When string list is used, each string in list will be used
+  as animation freame when plugin is in that state.
+
+```lua
+local status_const = require "mongosh-nvim.constant.status"
+local OperationState = status_const.OperationState
+
+{
+    "_operation_state",
+    symbol = {
+        [OperationState.Idle] = " ",
+        [OperationState.Execute] = { " ", " " },
+        [OperationState.Query] = { "󰮗 ", "󰈞 " },
+        [OperationState.Replace] = { " ", "󰏫 " },
+        [OperationState.MetaUpdate] = { " ", " " },
+        [OperationState.Connect] = { " ", " ", " ", "󰢹 ", " ", "󰢹 " },
+    },
+    frame_time = 0.1, -- second for each animation frame
+}
+```
+
+- `_running_cnt`, takes no argument, shows number of running mongosh process.
+- `_process_state`, shows simple symbol for indicating state of mongosh process
+  spawn by plugin.
+
+```lua
+local api_constant = require "mongosh-nvim.constant.api"
+local ProcessState = api_constant.ProcessState
+
+{
+    "_process_state",
+    state_symbol = {
+        [ProcessState.Unknown] = "➖",
+        [ProcessState.Running] = "🟢",
+        [ProcessState.Error] = "🔴",
+        [ProcessState.Exit] = "⚪",
+    }
+}
+```
+
+- `_mongosh_last_output`, shows last stdout or stderr output received from
+  mongosh process.
+
+```lua
+{
+    "_mongosh_last_output",
+    max_width = 15, -- max display width of message
+}
+```
