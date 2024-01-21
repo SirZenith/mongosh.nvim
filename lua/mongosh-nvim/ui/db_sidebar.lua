@@ -507,6 +507,11 @@ function UIDBSidebar:on_select_collection(item, collection)
     local preview_winnr = self:get_preview_win()
     api_buffer.create_query_buffer(item.name, collection, preview_winnr)
     self:write_to_buffer()
+
+    if config.sidebar.close_after_selection then
+        local tabpage = api.nvim_get_current_tabpage()
+        self:hide(tabpage)
+    end
 end
 
 function UIDBSidebar:update_collection_list_for_all_expanded_db()

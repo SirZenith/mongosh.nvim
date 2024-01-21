@@ -120,6 +120,10 @@ M = {
         ---@type integer
         padding = 4,
 
+        -- Close sidebar after selecting a collection
+        ---@type boolean
+        close_after_selection = true,
+
         -- Symbol for indication different types of list elemnt.
         symbol = {
             loading = {
