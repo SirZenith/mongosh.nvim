@@ -277,20 +277,28 @@ function TreeViewItem:get_display_height()
     return display_height
 end
 
-function TreeViewItem:mark_display_height_dirty()
+function TreeViewItem:_mark_display_height_dirty_non_recrusive()
     self.display_height = 0
     self.write_dirty = true
     self.card_edge_dirty = true
 end
 
-function TreeViewItem:mark_display_height_dirty_recursive()
-    self:mark_display_height_dirty()
+function TreeViewItem:_mark_display_height_dirty_recursive()
+    self:_mark_display_height_dirty_non_recrusive()
 
     local children = self.children
     if not children then return end
 
     for _, child in ipairs(children) do
-        child:mark_display_height_dirty_recursive()
+        child:_mark_display_height_dirty_recursive()
+    end
+end
+
+function TreeViewItem:mark_display_height_dirty()
+    if self.expanded then
+        self:_mark_display_height_dirty_recursive()
+    else
+        self:_mark_display_height_dirty_non_recrusive()
     end
 end
 
@@ -317,11 +325,13 @@ end
 
 -- Propagate change of display height bottom-up, starting form current entry.
 function TreeViewItem:display_height_changed()
+    self:mark_display_height_dirty()
+
     local walker = self --[[@as mongo.buffer.TreeViewItem?]]
     while walker do
         local cur_row = walker.st_row
 
-        walker:mark_display_height_dirty()
+        walker:_mark_display_height_dirty_non_recrusive()
         cur_row = walker:update_display_range(cur_row)
 
         local parent = walker.parent
@@ -329,9 +339,7 @@ function TreeViewItem:display_height_changed()
         if siblings then
             for i = 1, #siblings do
                 local sib = siblings[i]
-                if sib.expanded then
-                    sib:mark_display_height_dirty_recursive()
-                else
+                if sib ~= self then
                     sib:mark_display_height_dirty()
                 end
                 cur_row = sib:update_display_range(cur_row)
@@ -386,7 +394,7 @@ function TreeViewItem:_set_folding_level(level, max_sibling_depth)
     end
 
     if updated and not self.parent then
-        self:mark_display_height_dirty_recursive()
+        self:mark_display_height_dirty()
         self:update_display_range(1)
     end
 
