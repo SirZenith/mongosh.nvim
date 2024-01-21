@@ -1,11 +1,13 @@
 local api_core = require "mongosh-nvim.api.core"
 local api_constant = require "mongosh-nvim.constant.api"
+local status_const = require "mongosh-nvim.constant.status"
 local log = require "mongosh-nvim.log"
 local anim_util = require "mongosh-nvim.util.anim"
 
 local status_base = require "mongosh-nvim.ui.status.base"
 
 local CoreEventType = api_constant.CoreEventType
+local OperationState = status_const.OperationState
 local core_event = api_core.emitter
 local CharAnimation = anim_util.CharAnimation
 
@@ -13,15 +15,6 @@ local loop = vim.loop
 
 local M = {}
 
----@enum mongo.ui.status.OperationState
-local OperationState = {
-    Idle = 2,
-    Execute = 3,
-    Query = 4,
-    Replace = 5,
-    MetaUpdate = 6,
-    Connect = 7,
-}
 
 local STATE_PRIORITY_LIST = {
     OperationState.Connect,
