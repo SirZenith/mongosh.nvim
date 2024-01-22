@@ -37,7 +37,8 @@ local function try_get_tree_item(mbuf)
 end
 
 ---@param mbuf mongo.buffer.MongoBuffer
-local function update_tree_view(mbuf, typed_json)
+---@param callback fun(err?: string)
+local function update_tree_view(mbuf, typed_json, callback)
     local bufnr = mbuf:get_bufnr()
     if not bufnr then return end
 
@@ -47,17 +48,16 @@ local function update_tree_view(mbuf, typed_json)
         mbuf._state_args.tree_item = tree_item
     end
 
-    local ok, value = xpcall(function()
-        return vim.json.decode(typed_json)
-    end, function()
-        log.warn "failed to decode JSON result"
-    end)
-    tree_item:update_binded_value(ok and value or {})
+    local ok, value = pcall(vim.json.decode, typed_json)
+    if not ok then
+        callback("JSON decode error: " .. tostring(value))
+        return
+    end
 
-    local bo = vim.bo[bufnr]
-    bo.modifiable = true
-    tree_item:write_to_buffer(bufnr)
-    bo.modifiable = false
+    tree_item:update_binded_value(ok and value or {})
+    update_tree_to_buffer(bufnr, tree_item)
+
+    callback()
 end
 
 ---@param mbuf mongo.buffer.MongoBuffer
@@ -299,9 +299,7 @@ function M.content_writer(mbuf, callback)
             return
         end
 
-        update_tree_view(mbuf, response)
-
-        callback()
+        update_tree_view(mbuf, response, callback)
     end)
 end
 
