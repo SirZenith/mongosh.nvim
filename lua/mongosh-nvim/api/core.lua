@@ -34,7 +34,6 @@ local tmpfile_name_pool = {} ---@type string[]
 ---@return string
 local function get_tmpfile_name()
     local name = table.remove(tmpfile_name_pool) or vim.fn.tempname()
-    log.trace(name)
     return name
 end
 
