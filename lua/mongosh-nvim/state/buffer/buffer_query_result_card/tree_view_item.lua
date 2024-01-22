@@ -160,7 +160,7 @@ function TreeViewItem:update_binded_value(value)
     self:update_expansion_state()
     self:update_card_flag()
 
-    self:mark_display_height_dirty()
+    self:_mark_display_height_dirty_non_recrusive()
     if not self.parent then
         self:update_display_range(1)
     end
