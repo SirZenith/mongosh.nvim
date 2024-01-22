@@ -29,20 +29,31 @@ end
 
 -- ----------------------------------------------------------------------------
 
-local cached_tmpfile_name = nil ---@type string | nil
+local tmpfile_name_pool = {} ---@type string[]
+
+---@return string
+local function get_tmpfile_name()
+    local name = table.remove(tmpfile_name_pool) or vim.fn.tempname()
+    log.trace(name)
+    return name
+end
+
+---@param name string
+local function suspend_tmpfile_name(name)
+    tmpfile_name_pool[#tmpfile_name_pool + 1] = name
+end
 
 -- Write script snippet to temporary file before running.
+---@param tmpfile_name string
 ---@param script string
----@param callback fun(tmpfile_name?: string)
-function M.save_tmp_script_file(script, callback)
-    util.save_to_tmpfile(script, cached_tmpfile_name, function(err, tmpfile_name)
+---@param callback fun(err?: string)
+function M.save_tmp_script_file(tmpfile_name, script, callback)
+    util.save_to_tmpfile(script, tmpfile_name, function(err)
         if not tmpfile_name then
-            log.warn("failed to write snippet into temporary file: " .. err)
+            callback("failed to write snippet into temporary file: " .. err)
             return
         end
-
-        cached_tmpfile_name = tmpfile_name
-        callback(tmpfile_name)
+        callback()
     end)
 end
 
@@ -183,7 +194,18 @@ end
 function M.run_script(args)
     local address = args.db_address or mongosh_state.get_db_addr()
 
-    M.save_tmp_script_file(args.script, function(tmpfile_name)
+    local tmpfile_name = get_tmpfile_name()
+    M.save_tmp_script_file(tmpfile_name, args.script, function(err)
+        if err then
+            args.callback {
+                code = 1,
+                signal = 0,
+                stderr = err,
+                stdout = "",
+            }
+            return
+        end
+
         local exe_args = M.get_connection_args()
 
         local handle, pid = M.call_mongosh {
@@ -192,7 +214,10 @@ function M.run_script(args)
                 address,
                 tmpfile_name
             }),
-            callback = args.callback,
+            callback = function(result)
+                suspend_tmpfile_name(tmpfile_name)
+                args.callback(result)
+            end,
         }
 
         local on_process_started = args.on_process_started
