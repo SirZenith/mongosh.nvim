@@ -223,14 +223,15 @@ function UIDBSidebar:setup_buffer()
     bo.modifiable = false
 
     local kset = vim.keymap.set
+    local option = { buffer = bufnr }
 
     kset("n", "<Cr>", function()
         self:select_under_cursor()
-    end, { buffer = bufnr })
+    end, option)
 
     kset("n", "<C-r>", function()
         self:update_collection_list_for_all_expanded_db()
-    end)
+    end, option)
 end
 
 -- Setup window option before displying sidebar buffer in that window.
