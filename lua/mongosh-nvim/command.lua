@@ -10,6 +10,7 @@ local api_core = require "mongosh-nvim.api.core"
 local api_ui = require "mongosh-nvim.api.ui"
 
 local BufferType = buffer_const.BufferType
+local ResultSplitStyle = buffer_const.ResultSplitStyle
 
 ---@return boolean
 local function check_db_selected()
@@ -166,6 +167,10 @@ cmd_util.new_cmd {
                         log.warn(err)
                         next_step()
                         return
+                    end
+
+                    if config.dialog.split_style == ResultSplitStyle.Tab then
+                        vim.cmd "tabnew"
                     end
 
                     api_ui.show_db_sidebar()
