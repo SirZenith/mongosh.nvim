@@ -135,7 +135,9 @@ function TreeViewItem:update_binded_value(value)
         -- simple type
         local type = SIMPLE_TYPE_MAP[value_t] or ValueType.Unknown
         self.type = type
-        self.value = type ~= ValueType.Unknown and value or nil
+        if type ~= ValueType.Unknown then
+            self.value = value
+        end
         self.children = nil
     else
         local type = ValueType.Unknown
