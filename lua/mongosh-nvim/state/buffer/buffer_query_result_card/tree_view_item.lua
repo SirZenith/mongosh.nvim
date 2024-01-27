@@ -68,6 +68,7 @@ end
 ---@field value? any
 ---@field type string
 ---@field is_card boolean # whether this entry should be drawn as a card
+---@field update_session_id? integer
 --
 ---@field children? mongo.buffer.TreeViewItem[]
 ---@field child_table_type mongo.buffer.TreeEntryNestingType
@@ -88,6 +89,14 @@ end
 ---@field card_edge_dirty boolean
 local TreeViewItem = {}
 TreeViewItem.__index = TreeViewItem
+TreeViewItem._update_session_id = 0
+
+---@return integer
+function TreeViewItem._new_update_session()
+    local new_id = TreeViewItem._update_session_id + 1
+    TreeViewItem._update_session_id = new_id
+    return new_id
+end
 
 ---@param value any
 ---@param parent? mongo.buffer.TreeViewItem
@@ -1129,6 +1138,9 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
     local dot_path = table.concat(info.dot_path, ".")
     local id = vim.json.encode(info.id)
 
+    local session_id = TreeViewItem._new_update_session()
+    info.field.update_session_id = session_id
+
     util.do_async_steps {
         -- user input
         function(next_step)
@@ -1188,6 +1200,11 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
         function(_, err, result)
             if err then
                 callback(err)
+                return
+            end
+
+            if info.field.update_session_id ~= session_id then
+                callback()
                 return
             end
 
