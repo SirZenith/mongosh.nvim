@@ -9,12 +9,11 @@ mongosh and inspect executation result in NeoVim.
 
 You can:
 
-- Connect to database with authentication.
-- List available databases and collections for current connection.
-- Execute script in buffer.
-- Make query by buffer content.
-- Edit document by buffer content.
-- Refresh result buffer after some data operations.
+- Connecting to database with authentication.
+- Browsing available databases and collections in sidebar.
+- Execute, make query, edit document with content in current buffer.
+- Refresh your query result buffer after some data operations.
+- Check your query result with card view, and edit them right under your cursor.
 
 Following option can be customized:
 
@@ -23,6 +22,7 @@ Following option can be customized:
 - How result window splits current view.
 - Action on new buffer gets created by plugin, you can set keymap in new buffer
 or do other things of your interest.
+- Highlight used by sidebar and card view.
 
 ## Installation
 
@@ -55,7 +55,7 @@ subcommands that actually do something.
 
 Screen shot (click to jump to video):
 
-[![screen shot](./img/screen_shot.png)](https://youtu.be/t8gPMM5TuyI)
+[![screen shot](./img/screen_shot.png)](https://youtu.be/mKPvMBQuZy4 )
 
 ## Thanks
 
