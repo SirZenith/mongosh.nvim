@@ -83,22 +83,18 @@ local function try_edit_field(mbuf)
 
     util.do_async_steps {
         function(next_step)
-            tree_item:try_update_entry_value(nil, collection, function(err)
-                if err then
-                    log.warn(err)
-                else
-                    log.info "value edited"
-                    next_step()
-                end
-            end)
+            tree_item:try_update_entry_value(nil, collection, next_step)
         end,
-        function()
-            M.refresher(mbuf, function(err)
-                if err then
-                    log.warn(err)
-                end
-            end)
-        end
+        function(_, err)
+            if err then
+                log.warn(err)
+                return
+            end
+
+            log.info "value edited"
+
+            update_tree_to_buffer(bufnr, tree_item)
+        end,
     }
 end
 

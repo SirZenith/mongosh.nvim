@@ -283,6 +283,18 @@ function TreeViewItem:get_display_height()
     return display_height
 end
 
+-- Mark current entry as write dirty, this will propagate write dirty flag to
+-- its ancestors.
+function TreeViewItem:mark_write_dirty()
+    self.write_dirty = true
+    self.card_edge_dirty = true
+
+    local parent = self.parent
+    if parent then
+        parent:mark_write_dirty()
+    end
+end
+
 function TreeViewItem:_mark_display_height_dirty_non_recrusive()
     self.display_height = 0
     self.write_dirty = true
@@ -1115,48 +1127,91 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
     end
 
     local dot_path = table.concat(info.dot_path, ".")
+    local id = vim.json.encode(info.id)
 
     util.do_async_steps {
+        -- user input
         function(next_step)
             local prompt = "Edit"
             if meta.edit_type then
                 prompt = prompt .. " (type: " .. meta.edit_type .. ")"
             end
+
             local default
             if meta.edit_default_value then
                 default = meta.edit_default_value(info.field.value)
             end
+
             vim.ui.input({ prompt = prompt .. ": ", default = default }, next_step)
         end,
-        function(_, value_str)
+        -- write value into database
+        function(next_step, value_str)
             if not value_str then
-                callback "edit abort"
+                next_step "edit abort"
                 return
             end
 
             local err_value, value_json = edit_handler(value_str)
             if err_value or not value_json then
-                callback(err_value or "invalid input value")
+                next_step(err_value or "invalid input value")
                 return
             end
 
             local snippet = str_util.format(script_const.TEMPLATE_UPDATE_FIELD_VALUE, {
                 collection = collection,
-                id = vim.json.encode(info.id),
+                id = id,
                 dot_path = dot_path,
                 value = value_json
             })
 
-            api_core.do_update_one(snippet, function(err, result)
-                if err then
-                    callback(err)
-                    return
-                end
+            api_core.do_update_one(snippet, next_step)
+        end,
+        -- query edited value from database
+        function(next_step, err, _)
+            if err then
+                next_step(err)
+                return
+            end
 
-                result = #result > 0 and result or "execution successed"
+            local query = str_util.format(
+                script_const.SNIPPET_FIND_ONE,
+                {
+                    collection = collection,
+                    id = id,
+                    projection = vim.json.encode { [dot_path] = true },
+                }
+            )
 
-                callback()
+            api_core.do_query(query, next_step, "failed to update document content")
+        end,
+        -- write updated value to tree item
+        function(_, err, result)
+            if err then
+                callback(err)
+                return
+            end
+
+            local ok, value = pcall(function()
+                return vim.json.decode(result)
             end)
+
+            if not ok then
+                callback("JSON decode error: " .. tostring(value))
+                return
+            end
+
+            local field_value = value
+            for _, seg in ipairs(info.dot_path) do
+                if not field_value then
+                    break
+                end
+                field_value = field_value[seg]
+            end
+
+            info.field:update_binded_value(field_value)
+            info.field:mark_write_dirty()
+
+            callback()
         end
     }
 end
