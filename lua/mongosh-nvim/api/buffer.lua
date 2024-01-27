@@ -120,6 +120,7 @@ function M.run_buffer_query(bufnr, args)
     local type = mbuf:get_type()
     if type == BufferType.Execute then
         mbuf:change_type_to(BufferType.Query)
+        type = mbuf:get_type()
     end
 
     local supported_types = {
@@ -160,6 +161,7 @@ function M.run_buffer_edit(bufnr, args)
     local type = mbuf:get_type()
     if type == BufferType.Execute then
         mbuf:change_type_to(BufferType.Edit)
+        type = mbuf:get_type()
     end
 
     local supported_types = {
