@@ -1,6 +1,8 @@
 local api_core = require "mongosh-nvim.api.core"
 local buffer_const = require "mongosh-nvim.constant.buffer"
+local config = require "mongosh-nvim.config"
 local script_const = require "mongosh-nvim.constant.mongosh_script"
+local json_util = require "mongosh-nvim.util.json"
 local str_util = require "mongosh-nvim.util.str"
 
 local BufferType = buffer_const.BufferType
@@ -82,9 +84,9 @@ function M.content_writer(mbuf, callback)
                 field_value = field_value[seg]
             end
 
-            document = vim.json.encode {
+            document = json_util.stringify({
                 [dot_path_str] = field_value
-            }
+            }, config.indent_size)
         end
 
         local snippet = str_util.format(script_const.SNIPPET_EDIT, {
