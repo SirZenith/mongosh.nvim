@@ -10,6 +10,7 @@ local api_core = require "mongosh-nvim.api.core"
 local api_ui = require "mongosh-nvim.api.ui"
 
 local BufferType = buffer_const.BufferType
+local QueryResultStyle = buffer_const.QueryResultStyle
 local ResultSplitStyle = buffer_const.ResultSplitStyle
 
 ---@return boolean
@@ -342,7 +343,7 @@ cmd_util.new_cmd {
     available_checker = buffer_type_checker { BufferType.QueryResult },
     action = function(args)
         if args.persist then
-            config.query.result_style = BufferType.QueryResultCard
+            config.query.result_style = QueryResultStyle.Card
         end
 
         api_buffer.buffer_convert(
@@ -361,7 +362,7 @@ cmd_util.new_cmd {
     available_checker = buffer_type_checker { BufferType.QueryResultCard },
     action = function(args)
         if args.persist then
-            config.query.result_style = BufferType.QueryResult
+            config.query.result_style = QueryResultStyle.JSON
         end
 
         api_buffer.buffer_convert(
