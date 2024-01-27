@@ -335,14 +335,12 @@ function M.result_args_generator(mbuf, args, callback)
         return
     end
 
-    local dot_path = table.concat(info.dot_path, ".")
-
     callback(nil, {
         type = BufferType.Update,
         state_args = {
             collection = collection,
             id = vim.json.encode(info.id),
-            dot_path = dot_path,
+            dot_path = info.dot_path,
         }
     })
 end

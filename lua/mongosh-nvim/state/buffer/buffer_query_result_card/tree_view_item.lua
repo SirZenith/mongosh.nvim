@@ -1191,9 +1191,7 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
                 return
             end
 
-            local ok, value = pcall(function()
-                return vim.json.decode(result)
-            end)
+            local ok, value = pcall(vim.json.decode, result)
 
             if not ok then
                 callback("JSON decode error: " .. tostring(value))

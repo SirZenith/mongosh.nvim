@@ -48,8 +48,10 @@ function M.content_writer(mbuf, callback)
 
     local projection = { _id = false }
     local dot_path = mbuf._state_args.dot_path
+    local dot_path_str
     if dot_path then
-        projection[dot_path] = true
+        dot_path_str = table.concat(dot_path, ".")
+        projection[dot_path_str] = true
     end
 
     local query = mbuf._state_args.query or str_util.format(
@@ -67,10 +69,28 @@ function M.content_writer(mbuf, callback)
             return
         end
 
+        local document = result
+        if dot_path and dot_path_str then
+            local ok, value = pcall(vim.json.decode, result)
+            if not ok then
+                callback(value or "failed to decode query result")
+                return
+            end
+
+            local field_value = value
+            for _, seg in ipairs(dot_path) do
+                field_value = field_value[seg]
+            end
+
+            document = vim.json.encode {
+                [dot_path_str] = field_value
+            }
+        end
+
         local snippet = str_util.format(script_const.SNIPPET_EDIT, {
             collection = collection,
             id = id,
-            document = result,
+            document = document,
         })
 
         local lines = vim.split(snippet, "\n", { plain = true })

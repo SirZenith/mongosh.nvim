@@ -79,7 +79,7 @@ end
 
 -- Get access dot path of key-value pair in visual selection.
 ---@param bufnr integer
----@return string?
+---@return string[]?
 function M.get_visual_json_dot_path(bufnr)
     local buf_lines = api.nvim_buf_get_lines(bufnr, 0, -1, true)
     local buf_content = table.concat(buf_lines, "\n")

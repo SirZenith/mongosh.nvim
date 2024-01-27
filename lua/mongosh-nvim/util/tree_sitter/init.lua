@@ -10,7 +10,7 @@ local M = {}
 -- find_nearest_id_in_buffer tries to find `_id` field value of document around cursor.
 ---@param bufid integer
 function M.find_nearest_id_in_buffer(bufid)
-    local parser = ts.get_parser(bufid)
+    local parser = ts.get_parser(bufid, "json")
     local tree = parser:parse()[1]
 
     local query = query_json.QUERY_JSON_ID_FIELD
@@ -51,7 +51,7 @@ end
 -- access key path `user.foo`
 ---@param json_text string
 ---@param target_range { st_row: number, st_col: number, ed_row: number, ed_col: number } # all index are 0-base, column end is exclusive
----@return string?
+---@return string[]?
 function M.get_json_node_dot_path(json_text, target_range)
     ---@type LanguageTree
     local parser = ts.get_string_parser(json_text, "json")
@@ -93,7 +93,7 @@ function M.get_json_node_dot_path(json_text, target_range)
         return nil
     end
 
-    return table.concat(chain, ".")
+    return chain
 end
 
 return M
