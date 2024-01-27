@@ -78,10 +78,9 @@ successful run.
 
 - Build operation for an execute buffer is to run its content as
 mongosh script.
-- Refresh operation for an execution result buffer is to run content of the
-buffer that created it again, and update execution result to itself. If such
-buffer no longer exists, execution will use script of last successful run
-cached in buffer meta.
+- Refresh operation for an execution result buffer is to run script of last
+successful run cached in buffer meta, if no such cache were found, content of
+the buffer that created it will be used.
 
 ## Edit
 
@@ -122,8 +121,8 @@ call.
 with `replacement` set to value of document specifyed by `collection` and `id`
 in database.
 - Refresh operation for edit result buffer is to make `replaceOne` call with the
-content in the buffer that created it. If such buffer no longer exists, buffer
-will use script of last successful run cached in buffer meta.
+script of last successful run cached in buffer meta, if no such cache were found,
+content in the buffer that created it will be used.
 
 ## Query
 
