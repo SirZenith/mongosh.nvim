@@ -174,7 +174,7 @@ const filter = {}
 const projection = {}
 
 // Variable `result` will be treated as snippet output
-const result = db[collection].find(filter, projection)
+const result = db[collection].find(filter, projection).limit(10)
 ]]
 
 -- query template for finding one document with `_id`
