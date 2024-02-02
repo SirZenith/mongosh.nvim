@@ -333,7 +333,7 @@ M.COMPOSED_TYPE_IDENT_KEY = {
 M.SIMPLE_TYPE_MAP = {
     userdata = ValueType.Null,
     boolean = ValueType.Boolean,
-    number = ValueType.Numberst,
+    number = ValueType.Number,
     string = ValueType.String,
 }
 
