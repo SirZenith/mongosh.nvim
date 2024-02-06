@@ -292,18 +292,6 @@ function TreeViewItem:get_display_height()
     return display_height
 end
 
--- Mark current entry as write dirty, this will propagate write dirty flag to
--- its ancestors.
-function TreeViewItem:mark_write_dirty()
-    self.write_dirty = true
-    self.card_edge_dirty = true
-
-    local parent = self.parent
-    if parent then
-        parent:mark_write_dirty()
-    end
-end
-
 function TreeViewItem:_mark_display_height_dirty_non_recrusive()
     self.display_height = 0
     self.write_dirty = true
@@ -1224,7 +1212,7 @@ function TreeViewItem:try_update_entry_value(row, collection, callback)
             end
 
             info.field:update_binded_value(field_value)
-            info.field:mark_write_dirty()
+            info.field:display_height_changed()
 
             callback()
         end
