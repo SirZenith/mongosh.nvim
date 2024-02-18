@@ -1,9 +1,5 @@
 # mongosh.nvim
 
-<b>Notice</b>: still in early stage of development, might be breaking change.
-
----
-
 This is a frontend for mongosh. It provides your the ability to send script to
 mongosh and inspect executation result in NeoVim.
 
