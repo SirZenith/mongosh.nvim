@@ -1,4 +1,4 @@
-M = {}
+local M = {}
 
 local ELLIPSIS = "..."
 local ELLIPSIS_WIDTH = vim.fn.strdisplaywidth(ELLIPSIS)
