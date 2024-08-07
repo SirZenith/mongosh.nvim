@@ -71,7 +71,7 @@ end
 ---@return string[] lines
 function M.get_visual_selection_text()
     local st_r, st_c, ed_r, ed_c = M.get_visual_selection_range()
-    if not (st_r or st_c or ed_r or ed_c) then return {} end
+    if not (st_r and st_c and ed_r and ed_c) then return {} end
 
     local lines = api.nvim_buf_get_text(0, st_r, st_c, ed_r, ed_c, {})
     return lines

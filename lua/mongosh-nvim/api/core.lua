@@ -7,7 +7,7 @@ local util = require "mongosh-nvim.util"
 local str_util = require "mongosh-nvim.util.str"
 local event_util = require "mongosh-nvim.util.event"
 
-local loop = vim.loop
+local loop = vim.uv or vim.loop
 
 local M = {}
 

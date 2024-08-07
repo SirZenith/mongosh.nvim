@@ -11,7 +11,7 @@ local OperationState = status_const.OperationState
 local core_event = api_core.emitter
 local CharAnimation = anim_util.CharAnimation
 
-local loop = vim.loop
+local loop = vim.uv or vim.loop
 
 local M = {}
 
