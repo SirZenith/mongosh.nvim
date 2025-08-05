@@ -23,6 +23,8 @@ local MAX_TYPE_NAME_LEN = card_bson_types.MAX_TYPE_NAME_LEN
 local SIMPLE_TYPE_MAP = card_bson_types.SIMPLE_TYPE_MAP
 local VALUE_TYPE_NAME_MAP = card_bson_types.VALUE_TYPE_NAME_MAP
 
+local EMPTY_DICT_MT = getmetatable(vim.empty_dict())
+
 local get_type_display_name = card_bson_types.get_type_display_name
 local get_key_hl_by_indent_level = card_util.get_key_hl_by_indent_level
 
@@ -222,6 +224,11 @@ function TreeViewItem:load_child_value(value)
     for i = 1, #keys do
         local k = keys[i]
         children[#children + 1] = child_map[k]
+    end
+
+    -- preserving mark of empty object
+    if getmetatable(value) == EMPTY_DICT_MT then
+        setmetatable(children, EMPTY_DICT_MT)
     end
 
     self.children = children
@@ -487,8 +494,8 @@ function TreeViewItem:get_nested_table_type()
     local children = self.children
     if not children then return NestingType.None end
 
-    if #children == 0 then
-        return NestingType.EmptyTable
+    if getmetatable(children) == EMPTY_DICT_MT then
+        return NestingType.Object
     end
 
     local is_numeric_indexed = true
